@@ -17,13 +17,13 @@ namespace AbarimMUD.Import.Envy
 
 		private void ProcessArea(Stream stream, Area area)
 		{
-			var fileName = stream.ReadDikuString();
+			area.Filename = stream.ReadDikuString();
 			area.Name = stream.ReadDikuString();
 			area.Credits = stream.ReadDikuString();
 			area.ParseLevelsBuilds();
 
-			stream.ReadNumber(); // Start vnum
-			stream.ReadNumber(); // End vnum
+			area.StartVNum = stream.ReadNumber(); // Start vnum
+			area.EndVNum = stream.ReadNumber(); // End vnum
 
 			Log($"Created area {area.Name}");
 		}
@@ -84,6 +84,7 @@ namespace AbarimMUD.Import.Envy
 
 				var mobile = new Mobile
 				{
+					VNum = vnum,
 					Name = name,
 					ShortDescription = stream.ReadDikuString(),
 					LongDescription = stream.ReadDikuString(),
@@ -247,6 +248,7 @@ namespace AbarimMUD.Import.Envy
 
 				var obj = new GameObject
 				{
+					VNum = vnum,
 					Name = name,
 					ShortDescription = stream.ReadDikuString(),
 					Description = stream.ReadDikuString(),
@@ -396,6 +398,7 @@ namespace AbarimMUD.Import.Envy
 
 				var room = new Room
 				{
+					VNum = vnum,
 					Name = name,
 					Description = stream.ReadDikuString(),
 				};

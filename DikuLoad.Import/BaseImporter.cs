@@ -77,7 +77,7 @@ namespace DikuLoad.Import
 					var keyObj = GetObjectByVnum(dir.KeyObjectVNum.Value);
 					if (keyObj != null)
 					{
-						exit.KeyObjectId = keyObj.Id;
+						exit.KeyObjectId = keyObj.VNum;
 					}
 					else
 					{
@@ -116,8 +116,8 @@ namespace DikuLoad.Import
 								toDelete.Add(reset);
 								break;
 							}
-							reset.Id1 = mobile.Id;
-							reset.Id2 = room.Id;
+							reset.Id1 = mobile.VNum;
+							reset.Id2 = room.VNum;
 							break;
 						case AreaResetType.Item:
 							break;

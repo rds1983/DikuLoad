@@ -5,72 +5,27 @@ namespace DikuLoad.Data
 {
 	public enum ItemType
 	{
-		Light,
-		Scroll,
-		Wand,
-		Staff,
-		Weapon,
-		Treasure,
-		Armor,
-		Potion,
-		Clothing,
-		Furniture,
-		Trash,
-		Container,
-		Drink,
-		Key,
-		Food,
-		Money,
-		Boat,
-		NpcCorpse,
-		PcCorpse,
-		Fountain,
-		Pill,
-		Protect,
-		Map,
-		Portal,
-		WarpStone,
-		RoomKey,
-		Gem,
-		Jewelry,
-		JukeBox
-	}
-
-	public enum WearType
-	{
-		None = -1,
-		Light,
-		FingerLeft,
-		FingerRight,
-		Neck1,
-		Neck2,
-		Body,
-		Head,
-		Legs,
-		Feet,
-		Hands,
-		Arms,
-		Shield,
-		About,
-		Waist,
-		WristLeft,
-		WristRight,
-		Wield,
-		Hold,
-		Float
-	}
-
-	public enum WeaponType
-	{
-		Exotic,
-		Sword,
-		Mace,
-		Dagger,
-		Axe,
-		Staff,
-		Flail,
-		Whip,
-		Polearm
+		None = 0,
+		Light = 1,
+		Scroll = 2,
+		Wand = 3,
+		Staff = 4,
+		Weapon = 5,
+		Treasure = 8,
+		Armor = 9,
+		Potion = 10,
+		Furniture = 12,
+		Trash = 13,
+		Container = 15,
+		DrinkContainer = 17,
+		Key = 18,
+		Food = 19,
+		Money = 20,
+		Boat = 22,
+		NpcCorpse = 23,
+		PcCorpse = 24,
+		Fountain = 25,
+		Pill = 26,
 	}
 
 	[Flags]
@@ -91,23 +46,14 @@ namespace DikuLoad.Data
 		AntiNeutral = 1 << 11,
 		NoRemove = 1 << 12,
 		Inventory = 1 << 13,
-		NoPurge = 1 << 14,
-		RotDeath = 1 << 15,
-		VisDeath = 1 << 16,
-		NonMetal = 1 << 18,
-		NoLocate = 1 << 19,
-		MeltDrop = 1 << 20,
-		HadTimer = 1 << 21,
-		SellExtract = 1 << 22,
-		BurnProof = 1 << 24,
-		NounCurse = 1 << 25,
-		Corroded = 1 << 26,
+		Poisoned = 1 << 14,
+		VampireBane = 1 << 15,
+		Holy = 1 << 16,
 	}
 
 	[Flags]
 	public enum ItemWearFlags
 	{
-		None = 0,
 		Take = 1 << 0,
 		Finger = 1 << 1,
 		Neck = 1 << 2,

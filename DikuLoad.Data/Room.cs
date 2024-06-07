@@ -61,6 +61,6 @@ namespace DikuLoad.Data
 			Exits = new Dictionary<Direction, RoomExit>();
 		}
 
-		public override string ToString() => $"{Name} (#{Id})";
+		public override string ToString() => $"{Name} (#{VNum})";
 	}
 }

@@ -160,76 +160,83 @@ namespace AbarimMUD.Import.Envy
 			return stream.ReadLine().Trim();
 		}
 
-		public static int ReadFlag(this Stream stream)
+		public static void SkipWhitespace(this Stream stream)
 		{
-			int result = 0;
-			var negative = false;
-			var c = stream.ReadSpacedLetter();
-
-			if (c == '-')
-			{
-				negative = true;
-				c = stream.ReadLetter();
-			}
-
 			while (!stream.EndOfStream())
 			{
-				if (!char.IsDigit(c))
+				var c = (char)stream.ReadByte();
+				if (!char.IsWhiteSpace(c))
 				{
-					while (!stream.EndOfStream())
-					{
-						int bitsum = 0;
-						if ('A' <= c && c <= 'Z')
-						{
-							bitsum = 1;
-							for (int i = c; i > 'A'; i--)
-							{
-								bitsum *= 2;
-							}
-						}
-						else if ('a' <= c && c <= 'z')
-						{
-							bitsum = 67108864;
-							for (int i = c; i > 'a'; i--)
-							{
-								bitsum *= 2;
-							}
-						}
-						else
-						{
-							break;
-						}
-
-						result += bitsum;
-						c = stream.ReadLetter();
-					}
-				}
-
-				while (!stream.EndOfStream() && char.IsDigit(c))
-				{
-					result += result * 10 + (c - '0');
-					c = stream.ReadLetter();
-				}
-
-
-				if (c == '|')
-				{
-					c = stream.ReadLetter();
-					// Next iteration
-				}
-				else
-				{
-					if (c != ' ')
-					{
-						// Last symbol beint to the new data
-						stream.GoBackIfNotEOF();
-					}
-
+					stream.GoBackIfNotEOF();
 					break;
 				}
 			}
+		}
 
-			return negative ? -result : result;
+		public static int ReadFlag(this Stream stream, int asciiAddition = 0)
+		{
+			stream.SkipWhitespace();
+
+			var sb = new StringBuilder();
+			while (!stream.EndOfStream())
+			{
+				var c = (char)stream.ReadByte();
+				if (char.IsWhiteSpace(c))
+				{
+					break;
+				}
+
+				sb.Append(c);
+			}
+
+			var str = sb.ToString();
+			if (string.IsNullOrEmpty(str))
+			{
+				return 0;
+			}
+
+			int total = 0;
+			var parts = str.Split('|');
+			foreach (var p in parts)
+			{
+				str = p.Trim();
+				
+				var negative = false;
+				if (str.StartsWith("-"))
+				{
+					negative = true;
+					str = str.Substring(0);
+				}
+
+				int result = 0;
+				if (int.TryParse(str, out result))
+				{
+				}
+				else
+				{
+					// ASCII flags
+					for (var i = 0; i < str.Length; ++i)
+					{
+						var c = str[i];
+						if ('a' <= c && c <= 'z')
+						{
+							result |= 1 << (c - 'a' + asciiAddition);
+						}
+						else if ('A' <= c && c <= 'Z')
+						{
+							result |= 1 << (26 + c - 'a' + asciiAddition);
+						}
+						else
+						{
+							stream.RaiseError($"Could not parse ascii flag {str}");
+						}
+					}
+				}
+
+				total += negative ? -result : result;
+			}
+
+			return total;
 		}
 
 		public static int ReadNumber(this Stream stream)
@@ -417,7 +424,6 @@ namespace AbarimMUD.Import.Envy
 		public static T ReadEnumFromWordWithDef<T>(this Stream stream, T def) where T : struct, Enum
 		{
 			var word = stream.ReadWord();
-
 			if (string.IsNullOrEmpty(word))
 			{
 				return def;

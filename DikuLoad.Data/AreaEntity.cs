@@ -2,6 +2,6 @@
 {
 	public class AreaEntity
 	{
-		public int Id { get; set; }
+		public int VNum { get; set; }
 	}
 }

@@ -19,6 +19,8 @@ namespace DikuLoad.Data
 		public string Credits { get; set; }
 
 		public string Builders { get; set; }
+		public int StartVNum { get; set; }
+		public int EndVNum { get; set; }
 		public int Version { get; set; }
 		public string ResetMessage { get; set; }
 

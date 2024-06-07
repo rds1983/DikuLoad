@@ -108,7 +108,14 @@ namespace AbarimMUD.Import.Envy
 		{
 			while (!stream.EndOfStream())
 			{
-				var vnum = int.Parse(stream.ReadId());
+				stream.SkipWhitespace();
+				var line = stream.ReadLine().Trim();
+				if (line.StartsWith("$"))
+				{
+					break;
+				}
+
+				var vnum = int.Parse(line.Substring(1));
 				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
 				{
 					break;
@@ -126,24 +133,45 @@ namespace AbarimMUD.Import.Envy
 					Description = stream.ReadDikuString(),
 				};
 
+				area.Mobiles.Add(mobile);
+				AddMobileToCache(vnum, mobile);
+
+
 				if (Settings.SourceType == SourceType.ROM)
 				{
 					mobile.Race = stream.ReadDikuString();
 				}
 
-				var flags = (OldMobileFlags)stream.ReadFlag();
-				var affectedByFlags = (OldAffectedByFlags)stream.ReadFlag();
+				OldMobileFlags flags = 0;
+				OldAffectedByFlags affectedByFlags = 0;
 
-				mobile.Alignment = stream.ReadNumber().ToAlignment();
-
-				if (Settings.SourceType == SourceType.ROM)
+				var isCircleSimpleMob = true;
+				if (Settings.SourceType == SourceType.Circle)
 				{
-					mobile.Group = stream.ReadNumber();
+					line = stream.ReadLine().Trim();
+					if (line.EndsWith("E"))
+					{
+						isCircleSimpleMob = false;
+					}
 				}
 				else
 				{
-					var c = stream.ReadSpacedLetter();
+
+					flags = (OldMobileFlags)stream.ReadFlag();
+					affectedByFlags = (OldAffectedByFlags)stream.ReadFlag();
+
+					mobile.Alignment = stream.ReadNumber().ToAlignment();
+
+					if (Settings.SourceType == SourceType.ROM)
+					{
+						mobile.Group = stream.ReadNumber();
+					}
+					else
+					{
+						var c = stream.ReadSpacedLetter();
+					}
 				}
+
 				mobile.Level = stream.ReadNumber();
 				mobile.HitRoll = stream.ReadNumber();
 				mobile.ArmorClass = stream.ReadNumber();
@@ -193,63 +221,83 @@ namespace AbarimMUD.Import.Envy
 					mobile.Race = stream.ReadDikuString();
 					mobile.Sex = stream.ReadNumber();
 				}
-
-				area.Mobiles.Add(mobile);
-				AddMobileToCache(vnum, mobile);
-
-				// Add race flags
-				while (!stream.EndOfStream())
+				else if (Settings.SourceType == SourceType.Circle)
 				{
-					var c = stream.ReadSpacedLetter();
+					mobile.Wealth = stream.ReadNumber();
+					mobile.Xp = stream.ReadNumber();
+					mobile.StartPosition = stream.ReadNumber();
+					mobile.Position = stream.ReadNumber();
+					mobile.Sex = stream.ReadNumber();
 
-					if (c == 'F')
+					if (!isCircleSimpleMob)
 					{
-						var word = stream.ReadWord();
-						var vector = stream.ReadFlag();
-
-						switch (word.Substring(0, 3).ToLower())
+						while (!stream.EndOfStream())
 						{
-							case "act":
-								flags &= (OldMobileFlags)(~vector);
+							line = stream.ReadLine().Trim();
+							if (line == "E")
+							{
 								break;
-							case "aff":
-								affectedByFlags &= (OldAffectedByFlags)(~vector);
-								break;
-							case "off":
-								offenseFlags &= (OldMobileOffensiveFlags)(~vector);
-								break;
-							case "imm":
-								immuneFlags &= (OldResistanceFlags)(~vector);
-								break;
-							case "res":
-								resistanceFlags &= (OldResistanceFlags)(~vector);
-								break;
-							case "vul":
-								vulnerableFlags &= (OldResistanceFlags)(~vector);
-								break;
-							case "for":
-								formsFlags &= (FormFlags)(~vector);
-								break;
-							case "par":
-								partsFlags &= (PartFlags)(~vector);
-								break;
-							default:
-								stream.RaiseError($"Unknown flag {word}");
-								break;
+							}
 						}
 					}
-					else if (c == 'M')
-					{
-						var word = stream.ReadWord();
-						var mnum = stream.ReadNumber();
-						var trig = stream.ReadDikuString();
+				}
 
-						Log("Warning: mob triggers are ignored.");
-					}
-					else
+				if (Settings.SourceType == SourceType.ROM)
+				{
+					// Add race flags
+					while (!stream.EndOfStream())
 					{
-						stream.GoBackIfNotEOF();
-						break;
+						var c = stream.ReadSpacedLetter();
+
+						if (c == 'F')
+						{
+							var word = stream.ReadWord();
+							var vector = stream.ReadFlag();
+
+							switch (word.Substring(0, 3).ToLower())
+							{
+								case "act":
+									flags &= (OldMobileFlags)(~vector);
+									break;
+								case "aff":
+									affectedByFlags &= (OldAffectedByFlags)(~vector);
+									break;
+								case "off":
+									offenseFlags &= (OldMobileOffensiveFlags)(~vector);
+									break;
+								case "imm":
+									immuneFlags &= (OldResistanceFlags)(~vector);
+									break;
+								case "res":
+									resistanceFlags &= (OldResistanceFlags)(~vector);
+									break;
+								case "vul":
+									vulnerableFlags &= (OldResistanceFlags)(~vector);
+									break;
+								case "for":
+									formsFlags &= (FormFlags)(~vector);
+									break;
+								case "par":
+									partsFlags &= (PartFlags)(~vector);
+									break;
+								default:
+									stream.RaiseError($"Unknown flag {word}");
+									break;
+							}
+						}
+						else if (c == 'M')
+						{
+							var word = stream.ReadWord();
+							var mnum = stream.ReadNumber();
+							var trig = stream.ReadDikuString();
+
+							Log("Warning: mob triggers are ignored.");
+						}
+						else
+						{
+							stream.GoBackIfNotEOF();
+							break;
+						}
 					}
 				}
 
@@ -265,6 +313,25 @@ namespace AbarimMUD.Import.Envy
 				mobile.ImmuneFlags = immuneFlags.ToNewFlags();
 				mobile.ResistanceFlags = resistanceFlags.ToNewFlags();
 				mobile.VulnerableFlags = vulnerableFlags.ToNewFlags();
+
+				if (Settings.SourceType == SourceType.Circle)
+				{
+					// Optional triggers after the end of the room
+					while (!stream.EndOfStream())
+					{
+						var c = stream.ReadSpacedLetter();
+						if (c == 'T')
+						{
+							// Circle trigger
+							var n = stream.ReadNumber();
+						}
+						else
+						{
+							stream.GoBackIfNotEOF();
+							break;
+						}
+					}
+				}
 			}
 		}
 
@@ -627,6 +694,7 @@ namespace AbarimMUD.Import.Envy
 
 		private void ProcessResets(Stream stream, Area area)
 		{
+			int? mobileId = null;
 			while (!stream.EndOfStream())
 			{
 				var c = stream.ReadSpacedLetter();
@@ -655,6 +723,8 @@ namespace AbarimMUD.Import.Envy
 						{
 							reset.Value5 = stream.ReadNumber();
 						}
+
+						mobileId = reset.Value2;
 						break;
 
 					case 'O':
@@ -683,6 +753,14 @@ namespace AbarimMUD.Import.Envy
 						reset.Value1 = stream.ReadNumber();
 						reset.Value2 = stream.ReadNumber();
 						reset.Value3 = stream.ReadNumber();
+
+						if (mobileId == null)
+						{
+							stream.RaiseError("Mobile id not set for Give reset type");
+						}
+
+						reset.MobileVNum = mobileId.Value;
+
 						break;
 
 					case 'E':
@@ -691,6 +769,13 @@ namespace AbarimMUD.Import.Envy
 						reset.Value2 = stream.ReadNumber();
 						reset.Value3 = stream.ReadNumber();
 						reset.Value4 = stream.ReadNumber();
+
+						if (mobileId == null)
+						{
+							stream.RaiseError("Mobile id not set for Equip reset type");
+						}
+
+						reset.MobileVNum = mobileId.Value;
 						break;
 
 					case 'D':
@@ -908,7 +993,8 @@ namespace AbarimMUD.Import.Envy
 						if (!area.ParseLevelsBuilds())
 						{
 							Log($"WARNING: Couldn't parse levels/builders info from '{credits}'");
-						} else
+						}
+						else
 						{
 							// Area name should be after buildes
 							var i = credits.IndexOf(area.Builders);
@@ -936,7 +1022,7 @@ namespace AbarimMUD.Import.Envy
 						Log($"Area version: {area.Version}");
 						continue;
 					}
-					else if(type.StartsWith("AUTHOR"))
+					else if (type.StartsWith("AUTHOR"))
 					{
 						var data = type.Substring(7);
 						if (string.IsNullOrWhiteSpace(data))
@@ -948,7 +1034,7 @@ namespace AbarimMUD.Import.Envy
 						Log($"Area Author: {area.Credits}");
 						continue;
 					}
-					else if(type.StartsWith("RESETMSG"))
+					else if (type.StartsWith("RESETMSG"))
 					{
 						var data = type.Substring(9);
 						if (string.IsNullOrWhiteSpace(data))
@@ -1046,7 +1132,8 @@ namespace AbarimMUD.Import.Envy
 
 					ProcessFile(areaFile);
 				}
-			} else
+			}
+			else
 			{
 				var wldFolder = Path.Combine(Settings.InputFolder, "wld");
 				var indexFile = Path.Combine(wldFolder, "index");
@@ -1090,6 +1177,17 @@ namespace AbarimMUD.Import.Envy
 						using (var stream = File.OpenRead(objPath))
 						{
 							ProcessObjects(stream, area);
+						}
+					}
+
+					var mobPath = Path.Combine(Settings.InputFolder, "mob");
+					mobPath = Path.Combine(mobPath, Path.ChangeExtension(areaFileName, "mob"));
+					if (File.Exists(mobPath))
+					{
+						Log($"Loading mobiles from {mobPath}");
+						using (var stream = File.OpenRead(mobPath))
+						{
+							ProcessMobiles(stream, area);
 						}
 					}
 

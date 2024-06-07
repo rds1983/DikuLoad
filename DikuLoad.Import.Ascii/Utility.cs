@@ -118,6 +118,8 @@ namespace AbarimMUD.Import.Envy
 
 		public static string ReadLine(this Stream stream)
 		{
+			stream.SkipWhitespace();
+
 			var sb = new StringBuilder();
 
 			var endOfLine = false;

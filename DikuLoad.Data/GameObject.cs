@@ -98,5 +98,7 @@ namespace DikuLoad.Data
 		public string ExtraKeyword { get; set; }
 		public string ExtraDescription { get; set; }
 		public List<GameObjectEffect> Effects { get; } = new List<GameObjectEffect>();
+
+		public override string ToString() => $"{ShortDescription} (#{VNum})";
 	}
 }

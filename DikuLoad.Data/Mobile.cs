@@ -260,6 +260,6 @@ namespace DikuLoad.Data
 			SpecialAttacks = new List<MobileSpecialAttack>();
 		}
 
-		public override string ToString() => $"{Name} (#{VNum})";
+		public override string ToString() => $"{ShortDescription} (#{VNum})";
 	}
 }

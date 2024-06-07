@@ -15,6 +15,41 @@ namespace AbarimMUD.Import.Envy
 			Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 		}
 
+		private Area CircleReadAreaFromZon(Stream stream)
+		{
+			var vnum = int.Parse(stream.ReadId());
+			var credits = stream.ReadDikuString();
+			var name = stream.ReadDikuString();
+
+			var result = new Area
+			{
+				Name = name.Replace('/', '_'),
+				Credits = credits,
+			};
+
+			if (stream.EndOfStream())
+			{
+				return result;
+			}
+
+			var line = stream.ReadLine();
+			var parts = line.Split(' ');
+
+			if (parts.Length > 8)
+			{
+				result.MinimumLevel = parts[8].Trim();
+			}
+
+			if (parts.Length > 9)
+			{
+				result.MaximumLevel = parts[9].Trim();
+			}
+
+			ProcessResets(stream, result);
+
+			return result;
+		}
+
 		private void ProcessArea(Stream stream, Area area)
 		{
 			area.Filename = stream.ReadDikuString();
@@ -74,7 +109,7 @@ namespace AbarimMUD.Import.Envy
 			while (!stream.EndOfStream())
 			{
 				var vnum = int.Parse(stream.ReadId());
-				if (vnum == 0)
+				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
 				{
 					break;
 				}
@@ -237,8 +272,15 @@ namespace AbarimMUD.Import.Envy
 		{
 			while (!stream.EndOfStream())
 			{
-				var vnum = int.Parse(stream.ReadId());
-				if (vnum == 0)
+				stream.SkipWhitespace();
+				var line = stream.ReadLine().Trim();
+				if (line.StartsWith("$"))
+				{
+					break;
+				}
+
+				var vnum = int.Parse(line.Substring(1));
+				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
 				{
 					break;
 				}
@@ -255,14 +297,56 @@ namespace AbarimMUD.Import.Envy
 					Material = stream.ReadDikuString()
 				};
 
-				obj.ItemType = stream.ReadEnumFromWord<ItemType>();
-				obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
-				obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
-
 				area.Objects.Add(obj);
 				AddObjectToCache(vnum, obj);
 
-				if (Settings.SourceType == SourceType.ROM)
+				obj.ItemType = stream.ReadEnumFromWord<ItemType>();
+				if (Settings.SourceType == SourceType.Circle)
+				{
+					// 3 flags, each followed by 3 zeroes
+					obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
+					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+
+					obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
+					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+
+					obj.AffectedByFlags = ((OldAffectedByFlags)stream.ReadFlag(1)).ToNewFlags();
+					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+				}
+				else
+				{
+
+					obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
+					obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
+				}
+
+				if (Settings.SourceType == SourceType.Circle)
+				{
+					obj.Value1 = stream.ReadWord();
+					obj.Value2 = stream.ReadWord();
+					obj.Value3 = stream.ReadWord();
+					obj.Value4 = stream.ReadWord();
+
+					// Rest
+					stream.SkipWhitespace();
+					line = stream.ReadLine();
+					var parts = line.Split(' ');
+					if (parts.Length > 0)
+					{
+						obj.Weight = int.Parse(parts[0].Trim());
+					}
+
+					if (parts.Length > 1)
+					{
+						obj.Cost = int.Parse(parts[1].Trim());
+					}
+
+					if (parts.Length > 3)
+					{
+						obj.Level = int.Parse(parts[3].Trim());
+					}
+				}
+				else if (Settings.SourceType == SourceType.ROM)
 				{
 					obj.Value1 = stream.ReadWord();
 					obj.Value2 = stream.ReadWord();
@@ -279,42 +363,45 @@ namespace AbarimMUD.Import.Envy
 					obj.Value4 = stream.ReadDikuString();
 				}
 
-				obj.Weight = stream.ReadNumber();
-				obj.Cost = stream.ReadNumber();
+				if (Settings.SourceType != SourceType.Circle)
+				{
+					obj.Weight = stream.ReadNumber();
+					obj.Cost = stream.ReadNumber();
 
-				if (Settings.SourceType == SourceType.Envy)
-				{
-					obj.RentCost = stream.ReadNumber();
-				}
-				else
-				{
-					var letter = stream.ReadSpacedLetter();
-					switch (letter)
+					if (Settings.SourceType == SourceType.Envy)
 					{
-						case 'P':
-							obj.Condition = 100;
-							break;
-						case 'G':
-							obj.Condition = 90;
-							break;
-						case 'A':
-							obj.Condition = 75;
-							break;
-						case 'W':
-							obj.Condition = 50;
-							break;
-						case 'D':
-							obj.Condition = 25;
-							break;
-						case 'B':
-							obj.Condition = 10;
-							break;
-						case 'R':
-							obj.Condition = 0;
-							break;
-						default:
-							obj.Condition = 100;
-							break;
+						obj.RentCost = stream.ReadNumber();
+					}
+					else
+					{
+						var letter = stream.ReadSpacedLetter();
+						switch (letter)
+						{
+							case 'P':
+								obj.Condition = 100;
+								break;
+							case 'G':
+								obj.Condition = 90;
+								break;
+							case 'A':
+								obj.Condition = 75;
+								break;
+							case 'W':
+								obj.Condition = 50;
+								break;
+							case 'D':
+								obj.Condition = 25;
+								break;
+							case 'B':
+								obj.Condition = 10;
+								break;
+							case 'R':
+								obj.Condition = 0;
+								break;
+							default:
+								obj.Condition = 100;
+								break;
+						}
 					}
 				}
 
@@ -374,6 +461,11 @@ namespace AbarimMUD.Import.Envy
 						c == 'Y' || c == 'J' || c == 'G' || c == 'K' || c == 'V' || c == 'P' || c == 'd')
 					{
 					}
+					else if (c == 'T')
+					{
+						// Circle trigger
+						var n = stream.ReadNumber();
+					}
 					else
 					{
 						stream.GoBackIfNotEOF();
@@ -387,8 +479,15 @@ namespace AbarimMUD.Import.Envy
 		{
 			while (!stream.EndOfStream())
 			{
-				var vnum = int.Parse(stream.ReadId());
-				if (vnum == 0)
+				stream.SkipWhitespace();
+				var line = stream.ReadLine().Trim();
+				if (line.StartsWith("$"))
+				{
+					break;
+				}
+
+				var vnum = int.Parse(line.Substring(1));
+				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
 				{
 					break;
 				}
@@ -403,14 +502,19 @@ namespace AbarimMUD.Import.Envy
 					Description = stream.ReadDikuString(),
 				};
 
+				area.Rooms.Add(room);
+				AddRoomToCache(vnum, room);
+
 				stream.ReadNumber(); // Area Number
 
 				room.Flags = ((OldRoomFlags)stream.ReadFlag()).ToNewFlags();
-				room.SectorType = stream.ReadEnumFromWord<SectorType>();
 
-				// Save room to set its id
-				area.Rooms.Add(room);
-				AddRoomToCache(vnum, room);
+				if (Settings.SourceType == SourceType.Circle)
+				{
+					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+				}
+
+				room.SectorType = stream.ReadEnumFromWord<SectorType>();
 
 				while (!stream.EndOfStream())
 				{
@@ -480,6 +584,7 @@ namespace AbarimMUD.Import.Envy
 						if (targetVnum != -1)
 						{
 							exitInfo.TargetRoomVNum = targetVnum;
+							room.Exits[exit.Direction] = exit;
 						}
 
 						AddRoomExitToCache(exitInfo);
@@ -496,6 +601,25 @@ namespace AbarimMUD.Import.Envy
 					else
 					{
 						throw new Exception($"Unknown room command '{c}'");
+					}
+				}
+
+				if (Settings.SourceType == SourceType.Circle)
+				{
+					// Optional triggers after the end of the room
+					while (!stream.EndOfStream())
+					{
+						var c = stream.ReadSpacedLetter();
+						if (c == 'T')
+						{
+							// Circle trigger
+							var n = stream.ReadNumber();
+						}
+						else
+						{
+							stream.GoBackIfNotEOF();
+							break;
+						}
 					}
 				}
 			}
@@ -517,7 +641,7 @@ namespace AbarimMUD.Import.Envy
 					continue;
 				}
 
-				var reset = new OldAreaReset();
+				var reset = new AreaReset();
 				switch (c)
 				{
 					case 'M':
@@ -585,10 +709,17 @@ namespace AbarimMUD.Import.Envy
 						reset.Value3 = stream.ReadNumber();
 
 						break;
+
+					case 'T':
+						// Trigger
+						break;
+
+					default:
+						throw new Exception($"Unknown reset command {c}");
 				}
 
 				stream.ReadLine();
-				area.Resets.Add(reset.ToNewAreaReset());
+				area.Resets.Add(reset);
 			}
 		}
 
@@ -901,17 +1032,74 @@ namespace AbarimMUD.Import.Envy
 
 		public void Process()
 		{
-			var areaFiles = Directory.EnumerateFiles(Settings.InputFolder, "*.are", SearchOption.AllDirectories).ToArray();
-			foreach (var areaFile in areaFiles)
+			if (Settings.SourceType != SourceType.Circle)
 			{
-				var fn = Path.GetFileName(areaFile);
-				if (fn == "proto.are")
+				var areaFiles = Directory.EnumerateFiles(Settings.InputFolder, "*.are", SearchOption.AllDirectories).ToArray();
+				foreach (var areaFile in areaFiles)
 				{
-					Log($"Skipping prototype area {areaFile}");
-					continue;
-				}
+					var fn = Path.GetFileName(areaFile);
+					if (fn == "proto.are")
+					{
+						Log($"Skipping prototype area {areaFile}");
+						continue;
+					}
 
-				ProcessFile(areaFile);
+					ProcessFile(areaFile);
+				}
+			} else
+			{
+				var wldFolder = Path.Combine(Settings.InputFolder, "wld");
+				var indexFile = Path.Combine(wldFolder, "index");
+				var indexData = File.ReadAllText(indexFile);
+				var lines = indexData.Split("\n");
+
+				foreach (var line in lines)
+				{
+					var areaFileName = line.Trim();
+					if (areaFileName == "$")
+					{
+						break;
+					}
+
+					var wldFile = Path.Combine(wldFolder, areaFileName);
+					var zonPath = Path.Combine(Settings.InputFolder, "zon");
+					zonPath = Path.Combine(zonPath, Path.ChangeExtension(areaFileName, "zon"));
+					Area area;
+					if (File.Exists(zonPath))
+					{
+						Log($"Getting area name from {zonPath}...");
+						using (var stream = File.OpenRead(zonPath))
+						{
+							area = CircleReadAreaFromZon(stream);
+							Log($"Area name is '{area.Name}'");
+						}
+					}
+					else
+					{
+						area = new Area
+						{
+							Name = Path.GetFileName(wldFile).Replace('/', '_')
+						};
+					}
+
+					var objPath = Path.Combine(Settings.InputFolder, "obj");
+					objPath = Path.Combine(objPath, Path.ChangeExtension(areaFileName, "obj"));
+					if (File.Exists(objPath))
+					{
+						Log($"Loading objects from {objPath}");
+						using (var stream = File.OpenRead(objPath))
+						{
+							ProcessObjects(stream, area);
+						}
+					}
+
+					using (var stream = File.OpenRead(wldFile))
+					{
+						ProcessRooms(stream, area);
+					}
+
+					Areas.Add(area);
+				}
 			}
 
 			// Process shops

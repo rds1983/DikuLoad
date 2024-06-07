@@ -37,5 +37,26 @@ namespace DikuLoad.Data
 		public List<AreaReset> Resets { get; set; } = new List<AreaReset>();
 
 		public override string ToString() => $"{MinimumLevel}-{MaximumLevel} {Builders} {Name}";
+
+		public bool CanObjectBePopped(int objectId)
+		{
+			foreach(var reset in Resets)
+			{
+				switch (reset.ResetType)
+				{
+					case AreaResetType.Item:
+					case AreaResetType.Put:
+					case AreaResetType.Give:
+					case AreaResetType.Equip:
+						if (reset.Value2 == objectId)
+						{
+							return true;
+						}
+						break;
+				}
+			}
+
+			return false;
+		}
 	}
 }

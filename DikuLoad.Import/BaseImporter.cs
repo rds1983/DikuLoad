@@ -101,7 +101,7 @@ namespace DikuLoad.Import
 					switch (reset.ResetType)
 					{
 						case AreaResetType.NPC:
-							var room = GetRoomByVnum(reset.Id1);
+/*							var room = GetRoomByVnum(reset.Id1);
 							if (room == null)
 							{
 								Log($"WARNING: Unable to find room with vnum {reset.Id2} for #{i} reset of area {area.Name}");
@@ -117,7 +117,7 @@ namespace DikuLoad.Import
 								break;
 							}
 							reset.Id1 = mobile.VNum;
-							reset.Id2 = room.VNum;
+							reset.Id2 = room.VNum;*/
 							break;
 						case AreaResetType.Item:
 							break;

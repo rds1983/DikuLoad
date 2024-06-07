@@ -3,7 +3,8 @@
 	public enum SourceType
 	{
 		ROM,
-		Envy
+		Envy,
+		Circle
 	}
 
 	public class ImporterSettings

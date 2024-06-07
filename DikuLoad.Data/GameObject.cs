@@ -83,6 +83,7 @@ namespace DikuLoad.Data
 		public ItemType ItemType { get; set; }
 		public ItemWearFlags WearFlags { get; set; }
 		public ItemExtraFlags ExtraFlags { get; set; }
+		public HashSet<AffectedByFlags> AffectedByFlags { get; set; } = new HashSet<AffectedByFlags>();
 
 		public string Value1 { get; set; }
 		public string Value2 { get; set; }

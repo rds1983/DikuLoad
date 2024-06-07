@@ -697,7 +697,13 @@ namespace AbarimMUD.Import.Envy
 			int? mobileId = null;
 			while (!stream.EndOfStream())
 			{
-				var c = stream.ReadSpacedLetter();
+				var line = stream.ReadLine().Trim();
+				if (string.IsNullOrEmpty(line))
+				{
+					continue;
+				}
+
+				var c = line[0];
 				if (c == 'S')
 				{
 					break;
@@ -705,8 +711,14 @@ namespace AbarimMUD.Import.Envy
 
 				if (c == '*')
 				{
-					stream.ReadLine();
 					continue;
+				}
+
+				var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+
+				for(var i = 0; i < parts.Length; ++i)
+				{
+					parts[i] = parts[i].Trim();
 				}
 
 				var reset = new AreaReset();
@@ -714,14 +726,14 @@ namespace AbarimMUD.Import.Envy
 				{
 					case 'M':
 						reset.ResetType = AreaResetType.NPC;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
-						reset.Value4 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
+						reset.Value4 = int.Parse(parts[4]);
 
 						if (Settings.SourceType == SourceType.ROM)
 						{
-							reset.Value5 = stream.ReadNumber();
+							reset.Value5 = int.Parse(parts[5]);
 						}
 
 						mobileId = reset.Value2;
@@ -729,18 +741,18 @@ namespace AbarimMUD.Import.Envy
 
 					case 'O':
 						reset.ResetType = AreaResetType.Item;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
-						reset.Value4 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
+						reset.Value4 = int.Parse(parts[4]);
 						break;
 
 					case 'P':
 						reset.ResetType = AreaResetType.Put;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
-						reset.Value4 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
+						reset.Value4 = int.Parse(parts[4]);
 
 						if (Settings.SourceType == SourceType.ROM)
 						{
@@ -750,9 +762,9 @@ namespace AbarimMUD.Import.Envy
 
 					case 'G':
 						reset.ResetType = AreaResetType.Give;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
 
 						if (mobileId == null)
 						{
@@ -765,10 +777,10 @@ namespace AbarimMUD.Import.Envy
 
 					case 'E':
 						reset.ResetType = AreaResetType.Equip;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
-						reset.Value4 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
+						reset.Value4 = int.Parse(parts[4]);
 
 						if (mobileId == null)
 						{
@@ -780,18 +792,18 @@ namespace AbarimMUD.Import.Envy
 
 					case 'D':
 						reset.ResetType = AreaResetType.Door;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
-						reset.Value4 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
+						reset.Value4 = int.Parse(parts[4]);
 
 						break;
 
 					case 'R':
 						reset.ResetType = AreaResetType.Randomize;
-						reset.Value1 = stream.ReadNumber();
-						reset.Value2 = stream.ReadNumber();
-						reset.Value3 = stream.ReadNumber();
+						reset.Value1 = int.Parse(parts[1]);
+						reset.Value2 = int.Parse(parts[2]);
+						reset.Value3 = int.Parse(parts[3]);
 
 						break;
 
@@ -803,7 +815,6 @@ namespace AbarimMUD.Import.Envy
 						throw new Exception($"Unknown reset command {c}");
 				}
 
-				stream.ReadLine();
 				area.Resets.Add(reset);
 			}
 		}
@@ -1100,10 +1111,6 @@ namespace AbarimMUD.Import.Envy
 							}
 							break;
 						case "$":
-							if (area != null)
-							{
-								Areas.Add(area);
-							}
 							goto finish;
 						default:
 							Log($"Skipping section {type}");
@@ -1113,6 +1120,10 @@ namespace AbarimMUD.Import.Envy
 				}
 
 			finish:;
+				if (area != null)
+				{
+					Areas.Add(area);
+				}
 			}
 		}
 

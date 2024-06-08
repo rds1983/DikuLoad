@@ -370,15 +370,36 @@ namespace AbarimMUD.Import.Envy
 				obj.ItemType = stream.ReadEnumFromWord<ItemType>();
 				if (Settings.SourceType == SourceType.Circle)
 				{
-					// 3 flags, each followed by 3 zeroes
-					obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
-					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+					line = stream.ReadLine();
+					var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+					if (parts.Length >= 12)
+					{
+						// 3 flags, each followed by 3 zeroes
+						obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
+						stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
 
-					obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
-					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+						obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
+						stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
 
-					obj.AffectedByFlags = ((OldAffectedByFlags)stream.ReadFlag(1)).ToNewFlags();
-					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+						obj.AffectedByFlags = ((OldAffectedByFlags)stream.ReadFlag(1)).ToNewFlags();
+						stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+					} else
+					{
+						if (parts.Length > 0)
+						{
+							obj.ExtraFlags = (ItemExtraFlags)parts[0].Trim().ParseFlag();
+						}
+
+						if (parts.Length > 1)
+						{
+							obj.WearFlags = (ItemWearFlags)parts[1].Trim().ParseFlag();
+						}
+
+						if (parts.Length > 2)
+						{
+							obj.AffectedByFlags = ((OldAffectedByFlags)parts[2].ParseFlag(1)).ToNewFlags();
+						}
+					}
 				}
 				else
 				{
@@ -395,9 +416,8 @@ namespace AbarimMUD.Import.Envy
 					obj.Value4 = stream.ReadWord();
 
 					// Rest
-					stream.SkipWhitespace();
 					line = stream.ReadLine();
-					var parts = line.Split(' ');
+					var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
 					if (parts.Length > 0)
 					{
 						obj.Weight = int.Parse(parts[0].Trim());
@@ -572,16 +592,20 @@ namespace AbarimMUD.Import.Envy
 				area.Rooms.Add(room);
 				AddRoomToCache(vnum, room);
 
-				stream.ReadNumber(); // Area Number
+				line = stream.ReadLine();
+				var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
 
-				room.Flags = ((OldRoomFlags)stream.ReadFlag()).ToNewFlags();
+				var areaNumber = int.Parse(parts[0].Trim());
+				room.Flags = ((OldRoomFlags)parts[1].Trim().ParseFlag()).ToNewFlags();
 
-				if (Settings.SourceType == SourceType.Circle)
+				var add = 2;
+				if (parts.Length >= 6)
 				{
-					stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+					// Circle 3 zeroes
+					add += 3;
 				}
 
-				room.SectorType = stream.ReadEnumFromWord<SectorType>();
+				room.SectorType = stream.ToEnum<SectorType>(parts[add]);
 
 				while (!stream.EndOfStream())
 				{
@@ -1169,6 +1193,7 @@ namespace AbarimMUD.Import.Envy
 						using (var stream = File.OpenRead(zonPath))
 						{
 							area = CircleReadAreaFromZon(stream);
+							area.Filename = wldFile;
 							Log($"Area name is '{area.Name}'");
 						}
 					}

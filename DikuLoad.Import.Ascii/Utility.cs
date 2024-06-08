@@ -175,34 +175,16 @@ namespace AbarimMUD.Import.Envy
 			}
 		}
 
-		public static int ReadFlag(this Stream stream, int asciiAddition = 0)
+		public static int ParseFlag(this string str, int asciiAddition = 0)
 		{
-			stream.SkipWhitespace();
-
-			var sb = new StringBuilder();
-			while (!stream.EndOfStream())
-			{
-				var c = (char)stream.ReadByte();
-				if (char.IsWhiteSpace(c))
-				{
-					break;
-				}
-
-				sb.Append(c);
-			}
-
-			var str = sb.ToString();
-			if (string.IsNullOrEmpty(str))
-			{
-				return 0;
-			}
+			str = str.Trim();
 
 			int total = 0;
 			var parts = str.Split('|');
 			foreach (var p in parts)
 			{
 				str = p.Trim();
-				
+
 				var negative = false;
 				if (str.StartsWith("-"))
 				{
@@ -230,7 +212,7 @@ namespace AbarimMUD.Import.Envy
 						}
 						else
 						{
-							stream.RaiseError($"Could not parse ascii flag {str}");
+							throw new Exception($"Could not parse ascii flag {str}");
 						}
 					}
 				}
@@ -239,6 +221,34 @@ namespace AbarimMUD.Import.Envy
 			}
 
 			return total;
+		}
+
+		public static int ReadFlag(this Stream stream, int asciiAddition = 0)
+		{
+			stream.SkipWhitespace();
+
+			var sb = new StringBuilder();
+			while (!stream.EndOfStream())
+			{
+				var c = (char)stream.ReadByte();
+				if (char.IsWhiteSpace(c))
+				{
+					break;
+				}
+
+				sb.Append(c);
+			}
+
+			try
+			{
+				return sb.ToString().ParseFlag(asciiAddition);
+			}
+			catch(Exception ex)
+			{
+				stream.RaiseError(ex.Message);
+			}
+
+			return 0;
 		}
 
 		public static int ReadNumber(this Stream stream)

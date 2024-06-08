@@ -36,10 +36,14 @@ namespace DikuLoad.Data
 		DamRoll = 19,
 		SavingPara = 20,
 		SavingRod = 21,
-		SavingPetri = 22,
+		SavingPetrification = 22,
 		SavingBreath = 23,
 		SavingSpell = 24,
-		Race = 25
+		Race = 25,
+		Hp = Hit,
+		Armor = Ac,
+		Saves = SavingPara,
+		Chr,
 	}
 
 	public class GameObjectEffect

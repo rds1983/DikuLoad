@@ -26,6 +26,17 @@ namespace DikuLoad.Data
 		PcCorpse = 24,
 		Fountain = 25,
 		Pill = 26,
+		Instrument,
+		Talisman,
+		Skeleton,
+		ThiefPick,
+		Jewelry,
+		Portal,
+		Gem,
+		Clothing,
+		Map,
+		WarpStone,
+		NPCCorpseContainer,
 	}
 
 	[Flags]
@@ -71,13 +82,16 @@ namespace DikuLoad.Data
 		Hold = 1 << 14,
 		NoSac = 1 << 15,
 		Float = 1 << 16,
-		Light = 1 << 17
+		Light = 1 << 17,
+		WearFloat = Light,
+		Tattoo = 1 << 18,
 	}
 
 	public class GameObject : AreaEntity
 	{
 		public string Name { get; set; }
 		public string ShortDescription { get; set; }
+		public string LongDescription { get; set; }
 		public string Description { get; set; }
 		public string Material { get; set; }
 		public ItemType ItemType { get; set; }

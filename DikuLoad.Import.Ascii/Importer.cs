@@ -1160,7 +1160,7 @@ namespace AbarimMUD.Import.Envy
 			}
 		}
 
-		public void Process()
+		public override void Process()
 		{
 			Utility.RevertFlag = Settings.SourceType == SourceType.ROM;
 

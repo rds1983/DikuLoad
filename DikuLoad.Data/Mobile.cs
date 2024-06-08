@@ -229,6 +229,7 @@ namespace DikuLoad.Data
 		public Dice HitDice { get; set; }
 		public Dice ManaDice { get; set; }
 		public Dice DamageDice { get; set; }
+		public string Guild { get; set; }
 		public string AttackType { get; set; }
 		public int ArmorClassPierce { get; set; }
 		public int ArmorClassBash { get; set; }

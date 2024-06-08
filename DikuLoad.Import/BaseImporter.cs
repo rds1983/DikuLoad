@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace DikuLoad.Import
 {
-	public class BaseImporter
+	public abstract class BaseImporter
 	{
 		private readonly Dictionary<int, Room> _roomsByVnums = new Dictionary<int, Room>();
 		private readonly Dictionary<int, Mobile> _mobilesByVnums = new Dictionary<int, Mobile>();
@@ -140,5 +140,7 @@ namespace DikuLoad.Import
 				}
 			}
 		}
+
+		public abstract void Process();
 	}
 }

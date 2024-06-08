@@ -15,6 +15,8 @@ namespace AbarimMUD.Import.Envy
 		private static readonly Dictionary<OldResistanceFlags, ResistanceFlags> _resistanceFlagsMapper = new Dictionary<OldResistanceFlags, ResistanceFlags>();
 		private static readonly Dictionary<OldAffectedByFlags, AffectedByFlags> _affectedByFlagsMapper = new Dictionary<OldAffectedByFlags, AffectedByFlags>();
 
+		public static bool RevertFlag = false;
+
 
 		static Utility()
 		{
@@ -202,6 +204,17 @@ namespace AbarimMUD.Import.Envy
 					for (var i = 0; i < str.Length; ++i)
 					{
 						var c = str[i];
+						if (RevertFlag)
+						{
+							if (char.IsLower(c))
+							{
+								c = char.ToUpper(c);
+							} else if (char.IsUpper(c))
+							{
+								c = char.ToLower(c);
+							}
+						}
+
 						if ('a' <= c && c <= 'z')
 						{
 							result |= 1 << (c - 'a' + asciiAddition);

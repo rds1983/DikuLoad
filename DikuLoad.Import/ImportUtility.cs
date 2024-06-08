@@ -53,10 +53,7 @@ namespace DikuLoad.Import
 			if (match.Success)
 			{
 				area.MinimumLevel = area.MaximumLevel = match.Groups[1].Value;
-				if (string.IsNullOrEmpty(area.Builders))
-				{
-					area.Builders = match.Groups[2].Value;
-				}
+				area.Builders = match.Groups[2].Value;
 
 				Log($"Regex1 worked: parsed {area.MinimumLevel}/{area.Builders} from {c}");
 			}
@@ -69,10 +66,7 @@ namespace DikuLoad.Import
 					area.MinimumLevel = match.Groups[1].Value;
 					area.MaximumLevel = match.Groups[2].Value;
 
-					if (string.IsNullOrEmpty(area.Builders))
-					{
-						area.Builders = match.Groups[3].Value;
-					}
+					area.Builders = match.Groups[3].Value;
 
 					Log($"Regex2 worked: parsed [{area.MinimumLevel} {area.MaximumLevel}]/{area.Builders} from {c}");
 				}

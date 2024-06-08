@@ -174,7 +174,12 @@ namespace AbarimMUD.Import.Envy
 
 				mobile.Level = stream.ReadNumber();
 				mobile.HitRoll = stream.ReadNumber();
-				mobile.ArmorClass = stream.ReadNumber();
+
+				if (Settings.SourceType != SourceType.ROM)
+				{
+					mobile.ArmorClass = stream.ReadNumber();
+				}
+				
 				mobile.HitDice = stream.ReadDice();
 
 				if (Settings.SourceType == SourceType.ROM)
@@ -192,7 +197,7 @@ namespace AbarimMUD.Import.Envy
 				var partsFlags = PartFlags.None;
 				if (Settings.SourceType == SourceType.ROM)
 				{
-					mobile.AttackType = stream.ReadDikuString();
+					mobile.AttackType = stream.ReadWord();
 					mobile.ArmorClassPierce = stream.ReadNumber();
 					mobile.ArmorClassBash = stream.ReadNumber();
 					mobile.ArmorClassSlash = stream.ReadNumber();
@@ -204,30 +209,30 @@ namespace AbarimMUD.Import.Envy
 					resistanceFlags = (OldResistanceFlags)stream.ReadFlag();
 					vulnerableFlags = (OldResistanceFlags)stream.ReadFlag();
 
-					mobile.StartPosition = stream.ReadNumber();
-					mobile.Position = stream.ReadNumber();
-					mobile.Sex = stream.ReadNumber();
+					mobile.StartPosition = stream.ReadWord();
+					mobile.Position = stream.ReadWord();
+					mobile.Sex = stream.ReadWord();
 					mobile.Wealth = stream.ReadNumber();
 					mobile.FormFlags = (FormFlags)stream.ReadFlag();
 					mobile.PartFlags = (PartFlags)stream.ReadFlag();
-					mobile.Size = stream.ReadNumber();
-					mobile.Material = stream.ReadNumber();
+					mobile.Size = stream.ReadWord();
+					mobile.Material = stream.ReadWord();
 				}
 				else if (Settings.SourceType == SourceType.Envy)
 				{
 					mobile.Wealth = stream.ReadNumber();
 					mobile.Xp = stream.ReadNumber();
-					mobile.Position = stream.ReadNumber();
+					mobile.Position = stream.ReadWord();
 					mobile.Race = stream.ReadDikuString();
-					mobile.Sex = stream.ReadNumber();
+					mobile.Sex = stream.ReadWord();
 				}
 				else if (Settings.SourceType == SourceType.Circle)
 				{
 					mobile.Wealth = stream.ReadNumber();
 					mobile.Xp = stream.ReadNumber();
-					mobile.StartPosition = stream.ReadNumber();
-					mobile.Position = stream.ReadNumber();
-					mobile.Sex = stream.ReadNumber();
+					mobile.StartPosition = stream.ReadWord();
+					mobile.Position = stream.ReadWord();
+					mobile.Sex = stream.ReadWord();
 
 					if (!isCircleSimpleMob)
 					{
@@ -375,14 +380,9 @@ namespace AbarimMUD.Import.Envy
 					if (parts.Length >= 12)
 					{
 						// 3 flags, each followed by 3 zeroes
-						obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
-						stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
-
-						obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
-						stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
-
-						obj.AffectedByFlags = ((OldAffectedByFlags)stream.ReadFlag(1)).ToNewFlags();
-						stream.ReadNumber(); stream.ReadNumber(); stream.ReadNumber();
+						obj.ExtraFlags = (ItemExtraFlags)parts[0].Trim().ParseFlag();
+						obj.WearFlags = (ItemWearFlags)parts[4].Trim().ParseFlag();
+						obj.AffectedByFlags = ((OldAffectedByFlags)parts[8].ParseFlag(1)).ToNewFlags();
 					} else
 					{
 						if (parts.Length > 0)
@@ -403,7 +403,6 @@ namespace AbarimMUD.Import.Envy
 				}
 				else
 				{
-
 					obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
 					obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
 				}
@@ -435,7 +434,14 @@ namespace AbarimMUD.Import.Envy
 				}
 				else if (Settings.SourceType == SourceType.ROM)
 				{
-					obj.Value1 = stream.ReadWord();
+					if (obj.ItemType == ItemType.Armor)
+					{
+						obj.Value1 = stream.ReadFlag().ToString();
+					}
+					else
+					{
+						obj.Value1 = stream.ReadWord();
+					}
 					obj.Value2 = stream.ReadWord();
 					obj.Value3 = stream.ReadWord();
 					obj.Value4 = stream.ReadWord();
@@ -780,7 +786,7 @@ namespace AbarimMUD.Import.Envy
 
 						if (Settings.SourceType == SourceType.ROM)
 						{
-							reset.Value5 = stream.ReadNumber();
+							reset.Value5 = int.Parse(parts[5]);
 						}
 						break;
 
@@ -866,9 +872,12 @@ namespace AbarimMUD.Import.Envy
 					CloseHour = stream.ReadNumber(),
 				};
 
-				AddShopToCache(keeperVnum, shop);
+				if (Settings.SourceType != SourceType.ROM)
+				{
+					stream.ReadLine();
+				}
 
-				stream.ReadLine();
+				AddShopToCache(keeperVnum, shop);
 
 				Log($"Added shop for mobile {keeperVnum}");
 			}
@@ -1153,6 +1162,8 @@ namespace AbarimMUD.Import.Envy
 
 		public void Process()
 		{
+			Utility.RevertFlag = Settings.SourceType == SourceType.ROM;
+
 			if (Settings.SourceType != SourceType.Circle)
 			{
 				var areaFiles = Directory.EnumerateFiles(Settings.InputFolder, "*.are", SearchOption.AllDirectories).ToArray();

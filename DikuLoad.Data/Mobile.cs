@@ -237,15 +237,15 @@ namespace DikuLoad.Data
 		public HashSet<ResistanceFlags> ImmuneFlags { get; set; }
 		public HashSet<ResistanceFlags> ResistanceFlags { get; set; }
 		public HashSet<ResistanceFlags> VulnerableFlags { get; set; }
-		public int StartPosition { get; set; }
-		public int Position { get; set; }
-		public int Sex { get; set; }
+		public string StartPosition { get; set; }
+		public string Position { get; set; }
+		public string Sex { get; set; }
 		public int Wealth { get; set; }
 		public int Xp { get; set; }
 		public FormFlags FormFlags { get; set; }
 		public PartFlags PartFlags { get; set; }
-		public int Size { get; set; }
-		public int Material { get; set; }
+		public string Size { get; set; }
+		public string Material { get; set; }
 
 		public Shop Shop { get; set; }
 		public List<MobileSpecialAttack> SpecialAttacks { get; set; }

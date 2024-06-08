@@ -153,6 +153,7 @@ namespace DikuLoad.Import.CSL
 					LongDescription = itemElement.GetString("LongDescription"),
 					Description = itemElement.GetString("Description"),
 					Material = itemElement.GetString("Material"),
+					Level = itemElement.GetInt("Level"),
 					Value1 = itemElement.GetString("ArmorPierce"),
 					Value2 = itemElement.GetString("DiceCount"),
 					Value3 = itemElement.GetString("DiceSides"),

@@ -25,6 +25,7 @@ namespace AbarimMUD.Import.Envy
 			{
 				Name = name.Replace('/', '_'),
 				Credits = credits,
+				Builders = credits
 			};
 
 			if (stream.EndOfStream())
@@ -133,9 +134,11 @@ namespace AbarimMUD.Import.Envy
 					Description = stream.ReadDikuString(),
 				};
 
-				area.Mobiles.Add(mobile);
-				AddMobileToCache(vnum, mobile);
-
+				if (!CheckForbidden(name))
+				{
+					area.Mobiles.Add(mobile);
+					AddMobileToCache(vnum, mobile);
+				}
 
 				if (Settings.SourceType == SourceType.ROM)
 				{
@@ -369,8 +372,11 @@ namespace AbarimMUD.Import.Envy
 					Material = stream.ReadDikuString()
 				};
 
-				area.Objects.Add(obj);
-				AddObjectToCache(vnum, obj);
+				if (!CheckForbidden(name))
+				{
+					area.Objects.Add(obj);
+					AddObjectToCache(vnum, obj);
+				}
 
 				obj.ItemType = stream.ReadEnumFromWord<ItemType>();
 				if (Settings.SourceType == SourceType.Circle)
@@ -595,8 +601,11 @@ namespace AbarimMUD.Import.Envy
 					Description = stream.ReadDikuString(),
 				};
 
-				area.Rooms.Add(room);
-				AddRoomToCache(vnum, room);
+				if (!CheckForbidden(name))
+				{
+					area.Rooms.Add(room);
+					AddRoomToCache(vnum, room);
+				}
 
 				line = stream.ReadLine();
 				var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
@@ -901,7 +910,8 @@ namespace AbarimMUD.Import.Envy
 						var mobile = GetMobileByVnum(mobVnum);
 						if (mobile == null)
 						{
-							throw new Exception($"Could not find mobile with vnum {mobVnum}");
+							Log($"Warning: could not find mobile with vnum {mobVnum}");
+							break;
 						}
 
 						var special = new MobileSpecialAttack

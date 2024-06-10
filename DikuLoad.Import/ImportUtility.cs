@@ -49,6 +49,11 @@ namespace DikuLoad.Import
 		{
 			// Try to get levels range from the credits
 			var c = area.Credits.Trim();
+			if (string.IsNullOrEmpty(area.Builders))
+			{
+				area.Builders = c;
+			}
+
 			var match = CreditsRegEx1.Match(c);
 			if (match.Success)
 			{

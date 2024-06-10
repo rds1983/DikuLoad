@@ -67,6 +67,7 @@ namespace DikuLoad.Import.CSL
 					}
 
 					AddRoomExitToCache(exitInfo);
+
 				}
 
 				// Extra description
@@ -78,8 +79,11 @@ namespace DikuLoad.Import.CSL
 					room.ExtraDescription = extraDesc.GetString("Description");
 				}
 
-				area.Rooms.Add(room);
-				AddRoomToCache(vnum, room);
+				if (!CheckForbidden(name))
+				{
+					area.Rooms.Add(room);
+					AddRoomToCache(vnum, room);
+				}
 			}
 		}
 
@@ -129,8 +133,11 @@ namespace DikuLoad.Import.CSL
 
 				mobile.Wealth = gold * 10 + silver;
 
-				area.Mobiles.Add(mobile);
-				AddMobileToCache(vnum, mobile);
+				if (!CheckForbidden(name))
+				{
+					area.Mobiles.Add(mobile);
+					AddMobileToCache(vnum, mobile);
+				}
 			}
 		}
 
@@ -162,8 +169,11 @@ namespace DikuLoad.Import.CSL
 					WearFlags = itemElement.GetEnum<ItemWearFlags>("WearFlags"),
 				};
 
-				area.Objects.Add(obj);
-				AddObjectToCache(vnum, obj);
+				if (!CheckForbidden(name))
+				{
+					area.Objects.Add(obj);
+					AddObjectToCache(vnum, obj);
+				}
 
 				var affectsElement = itemElement.Element("Affects");
 				foreach (var affectElement in affectsElement.Nodes().OfType<XElement>())
@@ -185,14 +195,26 @@ namespace DikuLoad.Import.CSL
 			Log("Resets");
 
 			var resetsElement = root.Element("Resets");
+
+			int? mobileId = null;
 			foreach (var resetElement in resetsElement.Nodes().OfType<XElement>())
 			{
 				var reset = new AreaReset
 				{
 					ResetType = resetElement.EnsureEnum<AreaResetType>("Type"),
 					Value2 = resetElement.EnsureInt("Vnum"),
-					Value4 = resetElement.EnsureInt("Destination"),
+					Value4	 = resetElement.EnsureInt("Destination"),
 				};
+
+				if ((reset.ResetType == AreaResetType.Equip || reset.ResetType == AreaResetType.Give) && mobileId != null)
+				{
+					reset.MobileVNum = mobileId.Value;
+				}
+
+				if (reset.ResetType == AreaResetType.NPC)
+				{
+					mobileId = reset.Value2;
+				}
 
 				area.Resets.Add(reset);
 			}

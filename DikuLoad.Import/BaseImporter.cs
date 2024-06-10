@@ -7,6 +7,8 @@ namespace DikuLoad.Import
 {
 	public abstract class BaseImporter
 	{
+		public static string[] ForbiddenWords = { "Allah" };
+
 		private readonly Dictionary<int, Room> _roomsByVnums = new Dictionary<int, Room>();
 		private readonly Dictionary<int, Mobile> _mobilesByVnums = new Dictionary<int, Mobile>();
 		private readonly Dictionary<int, GameObject> _objectsByVnums = new Dictionary<int, GameObject>();
@@ -15,7 +17,7 @@ namespace DikuLoad.Import
 		private readonly List<RoomExitInfo> _tempDirections = new List<RoomExitInfo>();
 
 		public List<Area> Areas { get; } = new List<Area>();
-		public List<Social> Socials { get; } = new List<Social>();	
+		public List<Social> Socials { get; } = new List<Social>();
 
 		public static void Log(string message) => ImportUtility.Log(message);
 
@@ -39,6 +41,23 @@ namespace DikuLoad.Import
 		public void AddObjectToCache(int vnum, GameObject obj) => _objectsByVnums[vnum] = obj;
 		public void AddRoomExitToCache(RoomExitInfo exitInfo) => _tempDirections.Add(exitInfo);
 		public void AddShopToCache(int keeperVNum, Shop shop) => _shopsByKeepersVnums[keeperVNum] = shop;
+
+		protected bool CheckForbidden(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+			{
+				return false;
+			}
+
+			var forbiddenWord = (from w in ForbiddenWords where name.Contains(w, StringComparison.OrdinalIgnoreCase) select w).FirstOrDefault();
+			if (forbiddenWord != null)
+			{
+				Log($"Skipping since it contains forbidden word");
+				return true;
+			}
+
+			return false;
+		}
 
 		public void UpdateShops()
 		{
@@ -101,23 +120,23 @@ namespace DikuLoad.Import
 					switch (reset.ResetType)
 					{
 						case AreaResetType.NPC:
-/*							var room = GetRoomByVnum(reset.Id1);
-							if (room == null)
-							{
-								Log($"WARNING: Unable to find room with vnum {reset.Id2} for #{i} reset of area {area.Name}");
-								toDelete.Add(reset);
-								break;
-							}
+							/*							var room = GetRoomByVnum(reset.Id1);
+														if (room == null)
+														{
+															Log($"WARNING: Unable to find room with vnum {reset.Id2} for #{i} reset of area {area.Name}");
+															toDelete.Add(reset);
+															break;
+														}
 
-							var mobile = GetMobileByVnum(reset.Id2);
-							if (mobile == null)
-							{
-								Log($"WARNING: Unable to find mobile with vnum {reset.Id1} for #{i} reset of area {area.Name}");
-								toDelete.Add(reset);
-								break;
-							}
-							reset.Id1 = mobile.VNum;
-							reset.Id2 = room.VNum;*/
+														var mobile = GetMobileByVnum(reset.Id2);
+														if (mobile == null)
+														{
+															Log($"WARNING: Unable to find mobile with vnum {reset.Id1} for #{i} reset of area {area.Name}");
+															toDelete.Add(reset);
+															break;
+														}
+														reset.Id1 = mobile.VNum;
+														reset.Id2 = room.VNum;*/
 							break;
 						case AreaResetType.Item:
 							break;

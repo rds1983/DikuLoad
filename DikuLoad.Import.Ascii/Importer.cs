@@ -4,7 +4,7 @@ using System;
 using System.IO;
 using System.Linq;
 
-namespace AbarimMUD.Import.Envy
+namespace DikuLoad.Import.Ascii
 {
 	public class Importer : BaseImporter
 	{
@@ -1224,6 +1224,13 @@ namespace AbarimMUD.Import.Envy
 						{
 							Name = Path.GetFileName(wldFile).Replace('/', '_')
 						};
+					}
+
+					if (!string.IsNullOrEmpty(Settings.AreaNameFilter) &&
+						!area.Name.Contains(Settings.AreaNameFilter))
+					{
+						Log($"Skipping the area due to the area name filter");
+						continue;
 					}
 
 					var objPath = Path.Combine(Settings.InputFolder, "obj");

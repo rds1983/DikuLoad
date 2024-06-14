@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace AbarimMUD.Import.Envy
+namespace DikuLoad.Import.Ascii
 {
 	[Flags]
 	public enum OldRoomFlags

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace AbarimMUD.Import.Envy
+namespace DikuLoad.Import.Ascii
 {
 	internal static class Utility
 	{

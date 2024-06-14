@@ -1,4 +1,4 @@
-﻿namespace AbarimMUD.Import.Envy
+﻿namespace DikuLoad.Import.Ascii
 {
 	public enum SourceType
 	{
@@ -11,6 +11,7 @@
 	{
 		public string InputFolder { get; private set; }
 		public SourceType SourceType { get; private set; }
+		public string AreaNameFilter { get; set; }
 
 		public ImporterSettings(string inputFolder, SourceType sourceType)
 		{

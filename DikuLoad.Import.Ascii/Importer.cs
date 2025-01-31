@@ -179,7 +179,7 @@ namespace DikuLoad.Import.Ascii
 					}
 					else
 					{
-						var k = 5;
+						Log($"Warning: mob #{vnum} parameter count is neither 4, neither 10. Skipping that string.");
 					}
 				}
 				else

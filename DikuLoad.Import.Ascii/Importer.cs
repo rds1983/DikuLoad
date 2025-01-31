@@ -18,7 +18,13 @@ namespace DikuLoad.Import.Ascii
 		private Area CircleReadAreaFromZon(Stream stream)
 		{
 			var vnum = int.Parse(stream.ReadId());
-			var credits = stream.ReadDikuString();
+
+			string credits = null;
+			if (Settings.SubSourceType == SubSourceType.Default)
+			{
+				credits = stream.ReadDikuString();
+			}
+
 			var name = stream.ReadDikuString();
 
 			var result = new Area
@@ -776,6 +782,7 @@ namespace DikuLoad.Import.Ascii
 						}
 
 						mobileId = reset.Value2;
+						reset.MobileVNum = mobileId.Value;
 						break;
 
 					case 'O':
@@ -1226,10 +1233,10 @@ namespace DikuLoad.Import.Ascii
 						};
 					}
 
-					if (!string.IsNullOrEmpty(Settings.AreaNameFilter) &&
-						!area.Name.Contains(Settings.AreaNameFilter))
+					if (Settings.AreasNames != null &&
+						!Settings.AreasNames.Contains(area.Name))
 					{
-						Log($"Skipping the area due to the area name filter");
+						Log($"Skipping the area due to the areas names filter");
 						continue;
 					}
 

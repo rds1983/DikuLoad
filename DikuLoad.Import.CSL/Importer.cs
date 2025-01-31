@@ -214,6 +214,7 @@ namespace DikuLoad.Import.CSL
 				if (reset.ResetType == AreaResetType.NPC)
 				{
 					mobileId = reset.Value2;
+					reset.MobileVNum = reset.Value2;
 				}
 
 				area.Resets.Add(reset);

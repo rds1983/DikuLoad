@@ -1,5 +1,4 @@
 ﻿using DikuLoad.Data;
-using DikuLoad.Import;
 using System;
 using System.IO;
 using System.Linq;
@@ -158,9 +157,29 @@ namespace DikuLoad.Import.Ascii
 				if (Settings.SourceType == SourceType.Circle)
 				{
 					line = stream.ReadLine().Trim();
+
 					if (line.EndsWith("E"))
 					{
 						isCircleSimpleMob = false;
+					}
+
+					var parts = line.Split(" ");
+
+					if (parts.Length == 4)
+					{
+						// Old circle mud
+						flags = (OldMobileFlags)parts[0].ParseFlag();
+						affectedByFlags = (OldAffectedByFlags)parts[1].ParseFlag();
+						mobile.Alignment = int.Parse(parts[2]).ToAlignment();
+					} else if (parts.Length == 10)
+					{
+						flags = (OldMobileFlags)parts[0].ParseFlag();
+						affectedByFlags = (OldAffectedByFlags)parts[4].ParseFlag();
+						mobile.Alignment = int.Parse(parts[8]).ToAlignment();
+					}
+					else
+					{
+						var k = 5;
 					}
 				}
 				else

@@ -1306,7 +1306,7 @@ namespace DikuLoad.Import.Ascii
 
 		private void ProcessCircleArea(string wldFile)
 		{
-			var areaFileName = Path.GetDirectoryName(wldFile);
+			var areaFileName = Path.GetFileName(wldFile);
 
 			string zonPath;
 			if (Settings.SubSourceType != SubSourceType.Crimson)

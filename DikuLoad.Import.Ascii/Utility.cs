@@ -3,11 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace DikuLoad.Import.Ascii
 {
 	internal static class Utility
 	{
+		private static Regex RegexColorRemover = new Regex(@"\&\w");
 		private static readonly Dictionary<OldRoomFlags, RoomFlags> _roomFlagsMapper = new Dictionary<OldRoomFlags, RoomFlags>();
 		private static readonly Dictionary<OldRoomExitFlags, RoomExitFlags> _roomExitFlagsMapper = new Dictionary<OldRoomExitFlags, RoomExitFlags>();
 		private static readonly Dictionary<OldMobileFlags, MobileFlags> _mobileFlagsMapper = new Dictionary<OldMobileFlags, MobileFlags>();
@@ -18,11 +20,13 @@ namespace DikuLoad.Import.Ascii
 		public static bool RevertFlag = false;
 
 
+
 		static Utility()
 		{
 			PopulateMapper(_roomFlagsMapper);
 
 			PopulateMapper(_roomExitFlagsMapper);
+			_roomExitFlagsMapper[OldRoomExitFlags.BashProof] = RoomExitFlags.NoBash;
 
 			PopulateMapper(_mobileFlagsMapper);
 			_mobileFlagsMapper[OldMobileFlags.StayInArea] = MobileFlags.StayArea;
@@ -313,7 +317,7 @@ namespace DikuLoad.Import.Ascii
 
 		public static string ReadDikuString(this Stream stream)
 		{
-			var result = new StringBuilder();
+			var sb = new StringBuilder();
 
 			var c = stream.ReadSpacedLetter();
 			while (!stream.EndOfStream())
@@ -323,11 +327,16 @@ namespace DikuLoad.Import.Ascii
 					break;
 				}
 
-				result.Append(c);
+				sb.Append(c);
 				c = stream.ReadLetter();
 			}
 
-			return result.ToString();
+			var result = sb.ToString();
+			
+			// Strip of colors
+			result = RegexColorRemover.Replace(result, string.Empty);
+
+			return result;
 		}
 
 		public static char EnsureChar(this Stream stream, char expected, bool ignoreCase = false)

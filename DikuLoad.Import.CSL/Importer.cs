@@ -66,6 +66,20 @@ namespace DikuLoad.Import.CSL
 						exitInfo.TargetRoomVNum = targetVnum;
 					}
 
+					if (exit.Flags.Contains(RoomExitFlags.Locked))
+					{
+						// Add corresponding reset
+						var reset = new AreaReset
+						{
+							ResetType = AreaResetType.Door,
+							Value2 = vnum,
+							Value3 = (int)exit.Direction,
+							Value4 = 2
+						};
+
+						area.Resets.Add(reset);
+					}
+
 					AddRoomExitToCache(exitInfo);
 
 				}

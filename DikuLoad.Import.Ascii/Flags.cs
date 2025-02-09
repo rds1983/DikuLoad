@@ -29,6 +29,7 @@ namespace DikuLoad.Import.Ascii
 		Door = 1 << 0,
 		Closed = 1 << 1,
 		Locked = 1 << 2,
+		BashProof = 1 << 4,
 		PickProof = 1 << 5,
 		NoPass = 1 << 6,
 		Easy = 1 << 7,

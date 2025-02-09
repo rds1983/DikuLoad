@@ -42,6 +42,10 @@ namespace DikuLoad.Data
 
 		public int? KeyObjectId { get; set; }
 
+
+		[JsonIgnore]
+		public GameObject KeyObject { get; set; }
+
 		public object Tag { get; set; }
 	}
 

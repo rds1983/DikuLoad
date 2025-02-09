@@ -37,6 +37,7 @@ namespace DikuLoad.Data
 		Map,
 		WarpStone,
 		NPCCorpseContainer,
+		PC_Corpse = PcCorpse
 	}
 
 	[Flags]

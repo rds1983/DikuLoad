@@ -1,5 +1,6 @@
 ﻿using DikuLoad.Data;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -7,6 +8,8 @@ namespace DikuLoad.Import.Ascii
 {
 	public class Importer : BaseImporter
 	{
+		private readonly HashSet<string> _crimsonZones = new HashSet<string>();
+
 		public ImporterSettings Settings { get; private set; }
 
 		public Importer(ImporterSettings settings)
@@ -179,6 +182,7 @@ namespace DikuLoad.Import.Ascii
 					}
 					else
 					{
+						flags = (OldMobileFlags)parts[0].ParseFlag();
 						Log($"Warning: mob #{vnum} parameter count is neither 4, neither 10. Skipping that string.");
 					}
 				}
@@ -362,6 +366,31 @@ namespace DikuLoad.Import.Ascii
 						{
 							stream.GoBackIfNotEOF();
 							break;
+						}
+					}
+
+					if (Settings.SubSourceType == SubSourceType.Crimson)
+					{
+						var i = (int)flags;
+						if ((i & 8192) != 0 ||
+							(i & 16384) != 0 ||
+							(i & 32768) != 0)
+						{
+							mobile.Flags.Add(MobileFlags.Aggressive);
+						}
+
+						// Skip everything until next #
+						while (!stream.EndOfStream())
+						{
+							stream.SkipWhitespace();
+
+							var oldPos = stream.Position;
+							line = stream.ReadLine().Trim();
+							if (line.StartsWith("#") || line.StartsWith("$"))
+							{
+								stream.Seek(oldPos, SeekOrigin.Begin);
+								break;
+							}
 						}
 					}
 				}
@@ -679,29 +708,88 @@ namespace DikuLoad.Import.Ascii
 						var locks = stream.ReadNumber();
 
 						var exitFlags = OldRoomExitFlags.None;
-						switch (locks)
+
+						if (Settings.SourceType == SourceType.ROM)
 						{
-							case 1:
-								exitFlags = OldRoomExitFlags.Door;
-								break;
-							case 2:
-								exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof;
-								break;
-							case 3:
-								exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.NoPass;
-								break;
-							case 4:
-								exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof | OldRoomExitFlags.NoPass;
-								break;
-							default:
-								break;
+							switch (locks)
+							{
+								case 1:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.Closed;
+									break;
+								case 2:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.Closed | OldRoomExitFlags.Locked;
+									break;
+								case 3:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.Closed | OldRoomExitFlags.Locked | OldRoomExitFlags.NoPass;
+									break;
+								case 4:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.Closed | OldRoomExitFlags.Locked | OldRoomExitFlags.PickProof;
+									break;
+								case 5:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.Closed | OldRoomExitFlags.Locked | OldRoomExitFlags.PickProof | OldRoomExitFlags.NoPass;
+									break;
+								default:
+									break;
+							}
+						}
+						else if (Settings.SourceType == SourceType.Envy)
+						{
+							switch (locks)
+							{
+								case 1:
+									exitFlags = OldRoomExitFlags.Door;
+									break;
+								case 2:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof;
+									break;
+								case 3:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.BashProof;
+									break;
+								case 4:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof | OldRoomExitFlags.BashProof;
+									break;
+								case 5:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.NoPass;
+									break;
+								case 6:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof | OldRoomExitFlags.NoPass;
+									break;
+								case 7:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.BashProof | OldRoomExitFlags.NoPass;
+									break;
+								case 8:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof | OldRoomExitFlags.BashProof | OldRoomExitFlags.NoPass;
+									break;
+								default:
+									break;
+							}
+						}
+						else
+						{
+							switch (locks)
+							{
+								case 1:
+									exitFlags = OldRoomExitFlags.Door;
+									break;
+								case 2:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof;
+									break;
+								case 3:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.NoPass;
+									break;
+								case 4:
+									exitFlags = OldRoomExitFlags.Door | OldRoomExitFlags.PickProof | OldRoomExitFlags.NoPass;
+									break;
+								default:
+									break;
+							}
 						}
 
 						exit.Flags = exitFlags.ToNewFlags();
 
 						var exitInfo = new RoomExitInfo
 						{
-							SourceRoom = room,
+							SourceRoom = room,	
 							RoomExit = exit
 						};
 
@@ -1083,6 +1171,12 @@ namespace DikuLoad.Import.Ascii
 
 						area.Name = credits.Trim();
 
+						if (Settings.AreasNames != null && !Settings.AreasNames.Contains(area.Name))
+						{
+							Log($"Skipping the area due to the areas names filter");
+							return;
+						}
+
 						continue;
 					}
 					else if (type.StartsWith("RECALL"))
@@ -1135,6 +1229,13 @@ namespace DikuLoad.Import.Ascii
 								Filename = jsonFileName
 							};
 							ProcessArea(stream, area);
+
+							if (Settings.AreasNames != null && !Settings.AreasNames.Contains(area.Name))
+							{
+								Log($"Skipping the area due to the areas names filter");
+								return;
+							}
+
 							break;
 						case "AREADATA":
 							area = new Area
@@ -1142,6 +1243,13 @@ namespace DikuLoad.Import.Ascii
 								Filename = jsonFileName
 							};
 							ProcessAreaData(stream, area);
+
+							if (Settings.AreasNames != null && !Settings.AreasNames.Contains(area.Name))
+							{
+								Log($"Skipping the area due to the areas names filter");
+								return;
+							}
+
 							break;
 						case "MOBILES":
 							ProcessMobiles(stream, area);
@@ -1196,6 +1304,99 @@ namespace DikuLoad.Import.Ascii
 			}
 		}
 
+		private void ProcessCircleArea(string wldFile)
+		{
+			var areaFileName = Path.GetDirectoryName(wldFile);
+
+			string zonPath;
+			if (Settings.SubSourceType != SubSourceType.Crimson)
+			{
+				zonPath = Path.Combine(Settings.InputFolder, "zon");
+				zonPath = Path.Combine(zonPath, Path.ChangeExtension(areaFileName, "zon"));
+			}  else
+			{
+				zonPath = Path.ChangeExtension(wldFile, "zon");
+			}
+			
+			Area area;
+			if (File.Exists(zonPath))
+			{
+				Log($"Getting area name from {zonPath}...");
+				using (var stream = File.OpenRead(zonPath))
+				{
+					area = CircleReadAreaFromZon(stream);
+					area.Filename = wldFile;
+					Log($"Area name is '{area.Name}'");
+				}
+			}
+			else
+			{
+				area = new Area
+				{
+					Name = Path.GetFileName(wldFile).Replace('/', '_')
+				};
+			}
+
+			if (Settings.AreasNames != null &&
+				!Settings.AreasNames.Contains(area.Name))
+			{
+				Log($"Skipping the area due to the areas names filter");
+				return;
+			}
+
+			if (Settings.SubSourceType == SubSourceType.Crimson && !_crimsonZones.Contains(area.Name))
+			{
+				Log($"Skpping the area since it's not in the zones.tbl");
+				return;
+			}
+
+			string objPath;
+			if (Settings.SubSourceType != SubSourceType.Crimson)
+			{
+				objPath = Path.Combine(Settings.InputFolder, "obj");
+				objPath = Path.Combine(objPath, Path.ChangeExtension(areaFileName, "obj"));
+			} else
+			{
+				objPath = Path.ChangeExtension(wldFile, "obj");
+			}
+
+			if (File.Exists(objPath) && Settings.SubSourceType != SubSourceType.Crimson)
+			{
+				Log($"Loading objects from {objPath}");
+				using (var stream = File.OpenRead(objPath))
+				{
+					ProcessObjects(stream, area);
+				}
+			}
+
+			string mobPath;
+
+			if (Settings.SubSourceType != SubSourceType.Crimson)
+			{
+				mobPath = Path.Combine(Settings.InputFolder, "mob");
+				mobPath = Path.Combine(mobPath, Path.ChangeExtension(areaFileName, "mob"));
+			} else
+			{
+				mobPath = Path.ChangeExtension(wldFile, "mob");
+			}
+
+			if (File.Exists(mobPath))
+			{
+				Log($"Loading mobiles from {mobPath}");
+				using (var stream = File.OpenRead(mobPath))
+				{
+					ProcessMobiles(stream, area);
+				}
+			}
+
+			using (var stream = File.OpenRead(wldFile))
+			{
+				ProcessRooms(stream, area);
+			}
+
+			Areas.Add(area);
+		}
+
 		public override void Process()
 		{
 			Utility.RevertFlag = Settings.SourceType == SourceType.ROM;
@@ -1215,7 +1416,7 @@ namespace DikuLoad.Import.Ascii
 					ProcessFile(areaFile);
 				}
 			}
-			else
+			else if (Settings.SubSourceType != SubSourceType.Crimson)
 			{
 				var wldFolder = Path.Combine(Settings.InputFolder, "wld");
 				var indexFile = Path.Combine(wldFolder, "index");
@@ -1231,62 +1432,37 @@ namespace DikuLoad.Import.Ascii
 					}
 
 					var wldFile = Path.Combine(wldFolder, areaFileName);
-					var zonPath = Path.Combine(Settings.InputFolder, "zon");
-					zonPath = Path.Combine(zonPath, Path.ChangeExtension(areaFileName, "zon"));
-					Area area;
-					if (File.Exists(zonPath))
+					ProcessCircleArea(wldFile);
+				}
+			} else
+			{
+				// Crimson
+				var zonesFile = Path.Combine(Settings.InputFolder, "zones.tbl");
+
+				_crimsonZones.Clear();
+				using(var stream = File.OpenRead(zonesFile))
+				{
+					while (!stream.EndOfStream())
 					{
-						Log($"Getting area name from {zonPath}...");
-						using (var stream = File.OpenRead(zonPath))
+						var line = stream.ReadLine();
+						if (line == "$~")
 						{
-							area = CircleReadAreaFromZon(stream);
-							area.Filename = wldFile;
-							Log($"Area name is '{area.Name}'");
+							break;
+						}
+
+						var parts = line.Split(' ');
+						if (parts.Length > 0)
+						{
+							_crimsonZones.Add(parts[0].Trim());
+							Log($"Added zone '{parts[0].Trim()}'");
 						}
 					}
-					else
-					{
-						area = new Area
-						{
-							Name = Path.GetFileName(wldFile).Replace('/', '_')
-						};
-					}
+				}
 
-					if (Settings.AreasNames != null &&
-						!Settings.AreasNames.Contains(area.Name))
-					{
-						Log($"Skipping the area due to the areas names filter");
-						continue;
-					}
-
-					var objPath = Path.Combine(Settings.InputFolder, "obj");
-					objPath = Path.Combine(objPath, Path.ChangeExtension(areaFileName, "obj"));
-					if (File.Exists(objPath))
-					{
-						Log($"Loading objects from {objPath}");
-						using (var stream = File.OpenRead(objPath))
-						{
-							ProcessObjects(stream, area);
-						}
-					}
-
-					var mobPath = Path.Combine(Settings.InputFolder, "mob");
-					mobPath = Path.Combine(mobPath, Path.ChangeExtension(areaFileName, "mob"));
-					if (File.Exists(mobPath))
-					{
-						Log($"Loading mobiles from {mobPath}");
-						using (var stream = File.OpenRead(mobPath))
-						{
-							ProcessMobiles(stream, area);
-						}
-					}
-
-					using (var stream = File.OpenRead(wldFile))
-					{
-						ProcessRooms(stream, area);
-					}
-
-					Areas.Add(area);
+				var areaFiles = Directory.EnumerateFiles(Path.Combine(Settings.InputFolder, "areas"), "*.wld", SearchOption.AllDirectories).ToArray();
+				foreach(var wldFile  in areaFiles)
+				{
+					ProcessCircleArea(wldFile);
 				}
 			}
 

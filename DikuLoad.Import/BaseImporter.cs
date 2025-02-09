@@ -96,7 +96,7 @@ namespace DikuLoad.Import
 					var keyObj = GetObjectByVnum(dir.KeyObjectVNum.Value);
 					if (keyObj != null)
 					{
-						exit.KeyObjectId = keyObj.VNum;
+						exit.KeyObject = keyObj;
 					}
 					else
 					{

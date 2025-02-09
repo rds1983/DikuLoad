@@ -10,7 +10,8 @@
 	public enum SubSourceType
 	{
 		Default,
-		Circle31
+		Circle31,
+		Crimson
 	}
 
 	public class ImporterSettings

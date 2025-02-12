@@ -8,11 +8,11 @@ namespace DikuLoad.Import.CSL
 {
 	public class Importer : BaseImporter
 	{
-		private readonly string _inputFolder;
+		public ImporterSettings Settings { get; private set; }
 
-		public Importer(string inputFolder)
+		public Importer(ImporterSettings settings)
 		{
-			_inputFolder = inputFolder;
+			Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 		}
 
 
@@ -237,7 +237,7 @@ namespace DikuLoad.Import.CSL
 
 		public override void Process()
 		{
-			var areaFiles = Directory.EnumerateFiles(_inputFolder, "*.xml", SearchOption.AllDirectories).ToArray();
+			var areaFiles = Directory.EnumerateFiles(Settings.InputFolder, "*.xml", SearchOption.AllDirectories).ToArray();
 
 			foreach (var areaFile in areaFiles)
 			{
@@ -260,6 +260,12 @@ namespace DikuLoad.Import.CSL
 					Credits = areaData.GetString("Credits"),
 					Builders = areaData.GetString("Builders")
 				};
+
+				if (Settings.AreasNames != null && !Settings.AreasNames.Contains(area.Name))
+				{
+					Log($"Skipping the area due to the areas names filter");
+					continue;
+				}
 
 				// Try to get levels range from the credits
 				area.ParseLevelsBuilds();

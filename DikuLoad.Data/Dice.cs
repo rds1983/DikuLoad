@@ -11,6 +11,12 @@ namespace DikuLoad.Data
 		public int Count { get; set; }
 		public int Bonus { get; set; }
 
+		public bool IsZero => Sides == 0 && Count == 0 && Bonus == 0;
+
+		public int Minimum => Count + Bonus;
+		public int Maximum => Count * Sides + Bonus;
+		public int Average => Minimum + (Maximum - Minimum) / 2;
+
 		public Dice(int sides, int count, int bonus)
 		{
 			Sides = sides;

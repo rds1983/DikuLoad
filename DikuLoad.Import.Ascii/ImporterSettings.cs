@@ -4,7 +4,8 @@
 	{
 		ROM,
 		Envy,
-		Circle
+		Circle,
+		Soulmud
 	}
 
 	public enum SubSourceType

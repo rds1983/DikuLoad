@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DikuLoad.Import.Ascii
 {
@@ -113,508 +115,254 @@ namespace DikuLoad.Import.Ascii
 			Log($"Processed area data for {area.Name}");
 		}
 
-		private void ProcessMobiles(Stream stream, Area area)
+		private Mobile ProcessMobile(Stream stream)
 		{
-			while (!stream.EndOfStream())
+			stream.SkipWhitespace();
+			var line = stream.ReadLine().Trim();
+			if (line.StartsWith("$"))
 			{
-				stream.SkipWhitespace();
-				var line = stream.ReadLine().Trim();
-				if (line.StartsWith("$"))
+				return null;
+			}
+
+			int vnum;
+			if (!int.TryParse(line.Substring(1), out vnum))
+			{
+				return null;
+			}
+
+			if (vnum == 0 && Settings.SourceType != SourceType.Circle && Settings.SourceType != SourceType.Soulmud)
+			{
+				return null;
+			}
+
+			var name = stream.ReadDikuString().Replace("oldstyle ", "");
+			Log($"Processing mobile {name}...");
+
+			var mobile = new Mobile
+			{
+				VNum = vnum,
+				Name = name,
+				ShortDescription = stream.ReadDikuString(),
+				LongDescription = stream.ReadDikuString(),
+				Description = stream.ReadDikuString(),
+			};
+
+			if (Settings.SourceType == SourceType.ROM)
+			{
+				mobile.Race = stream.ReadDikuString();
+			}
+
+			OldMobileFlags flags = 0;
+			OldAffectedByFlags affectedByFlags = 0;
+
+			var isCircleSimpleMob = true;
+			if (Settings.SourceType == SourceType.Circle)
+			{
+				line = stream.ReadLine().Trim();
+
+				if (line.EndsWith("E"))
 				{
-					break;
+					isCircleSimpleMob = false;
 				}
 
-				var vnum = int.Parse(line.Substring(1));
-				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
+				var parts = line.Split(" ");
+
+				if (parts.Length == 4)
 				{
-					break;
+					// Old circle mud
+					flags = (OldMobileFlags)parts[0].ParseFlag();
+					affectedByFlags = (OldAffectedByFlags)parts[1].ParseFlag();
+					mobile.Alignment = int.Parse(parts[2]).ToAlignment();
 				}
-
-				var name = stream.ReadDikuString().Replace("oldstyle ", "");
-				Log($"Processing mobile {name}...");
-
-				var mobile = new Mobile
+				else if (parts.Length == 10)
 				{
-					VNum = vnum,
-					Name = name,
-					ShortDescription = stream.ReadDikuString(),
-					LongDescription = stream.ReadDikuString(),
-					Description = stream.ReadDikuString(),
-				};
-
-				if (!CheckForbidden(name))
-				{
-					area.Mobiles.Add(mobile);
-					AddMobileToCache(vnum, mobile);
-				}
-
-				if (Settings.SourceType == SourceType.ROM)
-				{
-					mobile.Race = stream.ReadDikuString();
-				}
-
-				OldMobileFlags flags = 0;
-				OldAffectedByFlags affectedByFlags = 0;
-
-				var isCircleSimpleMob = true;
-				if (Settings.SourceType == SourceType.Circle)
-				{
-					line = stream.ReadLine().Trim();
-
-					if (line.EndsWith("E"))
-					{
-						isCircleSimpleMob = false;
-					}
-
-					var parts = line.Split(" ");
-
-					if (parts.Length == 4)
-					{
-						// Old circle mud
-						flags = (OldMobileFlags)parts[0].ParseFlag();
-						affectedByFlags = (OldAffectedByFlags)parts[1].ParseFlag();
-						mobile.Alignment = int.Parse(parts[2]).ToAlignment();
-					} else if (parts.Length == 10)
-					{
-						flags = (OldMobileFlags)parts[0].ParseFlag();
-						affectedByFlags = (OldAffectedByFlags)parts[4].ParseFlag();
-						mobile.Alignment = int.Parse(parts[8]).ToAlignment();
-					}
-					else
-					{
-						flags = (OldMobileFlags)parts[0].ParseFlag();
-						Log($"Warning: mob #{vnum} parameter count is neither 4, neither 10. Skipping that string.");
-					}
+					flags = (OldMobileFlags)parts[0].ParseFlag();
+					affectedByFlags = (OldAffectedByFlags)parts[4].ParseFlag();
+					mobile.Alignment = int.Parse(parts[8]).ToAlignment();
 				}
 				else
 				{
+					flags = (OldMobileFlags)parts[0].ParseFlag();
+					Log($"Warning: mob #{vnum} parameter count is neither 4, neither 10. Skipping that string.");
+				}
+			}
+			else
+			{
 
-					flags = (OldMobileFlags)stream.ReadFlag();
-					affectedByFlags = (OldAffectedByFlags)stream.ReadFlag();
+				flags = (OldMobileFlags)stream.ReadFlag();
+				affectedByFlags = (OldAffectedByFlags)stream.ReadFlag();
 
-					mobile.Alignment = stream.ReadNumber().ToAlignment();
+				mobile.Alignment = stream.ReadNumber().ToAlignment();
 
-					if (Settings.SourceType == SourceType.ROM)
+				if (Settings.SourceType == SourceType.ROM)
+				{
+					mobile.Group = stream.ReadNumber();
+				}
+				else
+				{
+					if (Settings.SourceType == SourceType.Soulmud)
 					{
 						mobile.Group = stream.ReadNumber();
 					}
-					else
-					{
-						var c = stream.ReadSpacedLetter();
-					}
+
+					var c = stream.ReadSpacedLetter();
 				}
+			}
 
-				mobile.Level = stream.ReadNumber();
-				mobile.HitRoll = stream.ReadNumber();
+			mobile.Level = stream.ReadNumber();
+			mobile.HitRoll = stream.ReadNumber();
 
-				if (Settings.SourceType != SourceType.ROM)
+			if (Settings.SourceType != SourceType.ROM)
+			{
+				mobile.ArmorClass = stream.ReadNumber();
+			}
+
+			mobile.HitDice = stream.ReadDice();
+
+			if (Settings.SourceType == SourceType.ROM)
+			{
+				mobile.ManaDice = stream.ReadDice();
+			}
+
+			mobile.DamageDice = stream.ReadDice();
+
+			var offenseFlags = OldMobileOffensiveFlags.None;
+			var immuneFlags = OldResistanceFlags.None;
+			var resistanceFlags = OldResistanceFlags.None;
+			var vulnerableFlags = OldResistanceFlags.None;
+			var formsFlags = FormFlags.None;
+			var partsFlags = PartFlags.None;
+			if (Settings.SourceType == SourceType.ROM)
+			{
+				mobile.AttackType = stream.ReadWord();
+				mobile.ArmorClassPierce = stream.ReadNumber();
+				mobile.ArmorClassBash = stream.ReadNumber();
+				mobile.ArmorClassSlash = stream.ReadNumber();
+				mobile.ArmorClassExotic = stream.ReadNumber();
+
+
+				offenseFlags = (OldMobileOffensiveFlags)stream.ReadFlag();
+				immuneFlags = (OldResistanceFlags)stream.ReadFlag();
+				resistanceFlags = (OldResistanceFlags)stream.ReadFlag();
+				vulnerableFlags = (OldResistanceFlags)stream.ReadFlag();
+
+				mobile.StartPosition = stream.ReadWord();
+				mobile.Position = stream.ReadWord();
+				mobile.Sex = stream.ReadWord();
+				mobile.Wealth = stream.ReadNumber();
+				mobile.FormFlags = (FormFlags)stream.ReadFlag();
+				mobile.PartFlags = (PartFlags)stream.ReadFlag();
+				mobile.Size = stream.ReadWord();
+				mobile.Material = stream.ReadWord();
+			}
+			else if (Settings.SourceType == SourceType.Envy)
+			{
+				mobile.Wealth = stream.ReadNumber();
+				mobile.Xp = stream.ReadNumber();
+				mobile.Position = stream.ReadWord();
+				mobile.Race = stream.ReadDikuString();
+				mobile.Sex = stream.ReadWord();
+			}
+			else if (Settings.SourceType == SourceType.Circle)
+			{
+				mobile.Wealth = stream.ReadNumber();
+				mobile.Xp = stream.ReadNumber();
+				mobile.StartPosition = stream.ReadWord();
+				mobile.Position = stream.ReadWord();
+				mobile.Sex = stream.ReadWord();
+
+				if (!isCircleSimpleMob)
 				{
-					mobile.ArmorClass = stream.ReadNumber();
-				}
-				
-				mobile.HitDice = stream.ReadDice();
-
-				if (Settings.SourceType == SourceType.ROM)
-				{
-					mobile.ManaDice = stream.ReadDice();
-				}
-
-				mobile.DamageDice = stream.ReadDice();
-
-				var offenseFlags = OldMobileOffensiveFlags.None;
-				var immuneFlags = OldResistanceFlags.None;
-				var resistanceFlags = OldResistanceFlags.None;
-				var vulnerableFlags = OldResistanceFlags.None;
-				var formsFlags = FormFlags.None;
-				var partsFlags = PartFlags.None;
-				if (Settings.SourceType == SourceType.ROM)
-				{
-					mobile.AttackType = stream.ReadWord();
-					mobile.ArmorClassPierce = stream.ReadNumber();
-					mobile.ArmorClassBash = stream.ReadNumber();
-					mobile.ArmorClassSlash = stream.ReadNumber();
-					mobile.ArmorClassExotic = stream.ReadNumber();
-
-
-					offenseFlags = (OldMobileOffensiveFlags)stream.ReadFlag();
-					immuneFlags = (OldResistanceFlags)stream.ReadFlag();
-					resistanceFlags = (OldResistanceFlags)stream.ReadFlag();
-					vulnerableFlags = (OldResistanceFlags)stream.ReadFlag();
-
-					mobile.StartPosition = stream.ReadWord();
-					mobile.Position = stream.ReadWord();
-					mobile.Sex = stream.ReadWord();
-					mobile.Wealth = stream.ReadNumber();
-					mobile.FormFlags = (FormFlags)stream.ReadFlag();
-					mobile.PartFlags = (PartFlags)stream.ReadFlag();
-					mobile.Size = stream.ReadWord();
-					mobile.Material = stream.ReadWord();
-				}
-				else if (Settings.SourceType == SourceType.Envy)
-				{
-					mobile.Wealth = stream.ReadNumber();
-					mobile.Xp = stream.ReadNumber();
-					mobile.Position = stream.ReadWord();
-					mobile.Race = stream.ReadDikuString();
-					mobile.Sex = stream.ReadWord();
-				}
-				else if (Settings.SourceType == SourceType.Circle)
-				{
-					mobile.Wealth = stream.ReadNumber();
-					mobile.Xp = stream.ReadNumber();
-					mobile.StartPosition = stream.ReadWord();
-					mobile.Position = stream.ReadWord();
-					mobile.Sex = stream.ReadWord();
-
-					if (!isCircleSimpleMob)
-					{
-						while (!stream.EndOfStream())
-						{
-							line = stream.ReadLine().Trim();
-							if (line == "E")
-							{
-								break;
-							}
-						}
-					}
-				}
-
-				if (Settings.SourceType == SourceType.ROM)
-				{
-					// Add race flags
 					while (!stream.EndOfStream())
 					{
-						var c = stream.ReadSpacedLetter();
-
-						if (c == 'F')
+						line = stream.ReadLine().Trim();
+						if (line == "E")
 						{
-							var word = stream.ReadWord();
-							var vector = stream.ReadFlag();
-
-							switch (word.Substring(0, 3).ToLower())
-							{
-								case "act":
-									flags &= (OldMobileFlags)(~vector);
-									break;
-								case "aff":
-									affectedByFlags &= (OldAffectedByFlags)(~vector);
-									break;
-								case "off":
-									offenseFlags &= (OldMobileOffensiveFlags)(~vector);
-									break;
-								case "imm":
-									immuneFlags &= (OldResistanceFlags)(~vector);
-									break;
-								case "res":
-									resistanceFlags &= (OldResistanceFlags)(~vector);
-									break;
-								case "vul":
-									vulnerableFlags &= (OldResistanceFlags)(~vector);
-									break;
-								case "for":
-									formsFlags &= (FormFlags)(~vector);
-									break;
-								case "par":
-									partsFlags &= (PartFlags)(~vector);
-									break;
-								default:
-									stream.RaiseError($"Unknown flag {word}");
-									break;
-							}
-						}
-						else if (c == 'M')
-						{
-							var word = stream.ReadWord();
-							var mnum = stream.ReadNumber();
-							var trig = stream.ReadDikuString();
-
-							Log("Warning: mob triggers are ignored.");
-						}
-						else
-						{
-							stream.GoBackIfNotEOF();
 							break;
-						}
-					}
-				}
-
-				// Set flags
-				mobile.Flags = flags.ToNewFlags();
-				var newOffensiveFlags = offenseFlags.ToNewFlags();
-				foreach (var f in newOffensiveFlags)
-				{
-					mobile.Flags.Add(f);
-				}
-
-				mobile.AffectedByFlags = affectedByFlags.ToNewFlags();
-				mobile.ImmuneFlags = immuneFlags.ToNewFlags();
-				mobile.ResistanceFlags = resistanceFlags.ToNewFlags();
-				mobile.VulnerableFlags = vulnerableFlags.ToNewFlags();
-
-				if (Settings.SourceType == SourceType.Circle)
-				{
-					// Optional triggers after the end of the room
-					while (!stream.EndOfStream())
-					{
-						var c = stream.ReadSpacedLetter();
-						if (c == 'T')
-						{
-							// Circle trigger
-							var n = stream.ReadNumber();
-						}
-						else
-						{
-							stream.GoBackIfNotEOF();
-							break;
-						}
-					}
-
-					if (Settings.SubSourceType == SubSourceType.Crimson)
-					{
-						var i = (int)flags;
-						if ((i & 8192) != 0 ||
-							(i & 16384) != 0 ||
-							(i & 32768) != 0)
-						{
-							mobile.Flags.Add(MobileFlags.Aggressive);
-						}
-
-						// Skip everything until next #
-						while (!stream.EndOfStream())
-						{
-							stream.SkipWhitespace();
-
-							var oldPos = stream.Position;
-							line = stream.ReadLine().Trim();
-							if (line.StartsWith("#") || line.StartsWith("$"))
-							{
-								stream.Seek(oldPos, SeekOrigin.Begin);
-								break;
-							}
 						}
 					}
 				}
 			}
-		}
 
-		private void ProcessObjects(Stream stream, Area area)
-		{
-			while (!stream.EndOfStream())
+			if (Settings.SourceType == SourceType.ROM)
 			{
-				stream.SkipWhitespace();
-				var line = stream.ReadLine().Trim();
-				if (line.StartsWith("$"))
-				{
-					break;
-				}
-
-				var vnum = int.Parse(line.Substring(1));
-				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
-				{
-					break;
-				}
-
-				var name = stream.ReadDikuString();
-				Log($"Processing object {name}...");
-
-				var obj = new GameObject
-				{
-					VNum = vnum,
-					Name = name,
-					ShortDescription = stream.ReadDikuString(),
-					Description = stream.ReadDikuString(),
-					Material = stream.ReadDikuString()
-				};
-
-				if (!CheckForbidden(name))
-				{
-					area.Objects.Add(obj);
-					AddObjectToCache(vnum, obj);
-				}
-
-				obj.ItemType = stream.ReadEnumFromWord<ItemType>();
-				if (Settings.SourceType == SourceType.Circle)
-				{
-					line = stream.ReadLine();
-					var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-					if (parts.Length >= 12)
-					{
-						// 3 flags, each followed by 3 zeroes
-						obj.ExtraFlags = (ItemExtraFlags)parts[0].Trim().ParseFlag();
-						obj.WearFlags = (ItemWearFlags)parts[4].Trim().ParseFlag();
-						obj.AffectedByFlags = ((OldAffectedByFlags)parts[8].ParseFlag(1)).ToNewFlags();
-					} else
-					{
-						if (parts.Length > 0)
-						{
-							obj.ExtraFlags = (ItemExtraFlags)parts[0].Trim().ParseFlag();
-						}
-
-						if (parts.Length > 1)
-						{
-							obj.WearFlags = (ItemWearFlags)parts[1].Trim().ParseFlag();
-						}
-
-						if (parts.Length > 2)
-						{
-							obj.AffectedByFlags = ((OldAffectedByFlags)parts[2].ParseFlag(1)).ToNewFlags();
-						}
-					}
-				}
-				else
-				{
-					obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
-					obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
-				}
-
-				if (Settings.SourceType == SourceType.Circle)
-				{
-					obj.Value1 = stream.ReadWord();
-					obj.Value2 = stream.ReadWord();
-					obj.Value3 = stream.ReadWord();
-					obj.Value4 = stream.ReadWord();
-
-					// Rest
-					line = stream.ReadLine();
-					var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-					if (parts.Length > 0)
-					{
-						obj.Weight = int.Parse(parts[0].Trim());
-					}
-
-					if (parts.Length > 1)
-					{
-						obj.Cost = int.Parse(parts[1].Trim());
-					}
-
-					if (parts.Length > 3)
-					{
-						obj.Level = int.Parse(parts[3].Trim());
-					}
-				}
-				else if (Settings.SourceType == SourceType.ROM)
-				{
-					if (obj.ItemType == ItemType.Armor)
-					{
-						obj.Value1 = stream.ReadFlag().ToString();
-					}
-					else
-					{
-						obj.Value1 = stream.ReadWord();
-					}
-					obj.Value2 = stream.ReadWord();
-					obj.Value3 = stream.ReadWord();
-					obj.Value4 = stream.ReadWord();
-					obj.Value5 = stream.ReadWord();
-					obj.Level = stream.ReadNumber();
-				}
-				else
-				{
-					obj.Value1 = stream.ReadDikuString();
-					obj.Value2 = stream.ReadDikuString();
-					obj.Value3 = stream.ReadDikuString();
-					obj.Value4 = stream.ReadDikuString();
-				}
-
-				if (Settings.SourceType != SourceType.Circle)
-				{
-					obj.Weight = stream.ReadNumber();
-					obj.Cost = stream.ReadNumber();
-
-					if (Settings.SourceType == SourceType.Envy)
-					{
-						obj.RentCost = stream.ReadNumber();
-					}
-					else
-					{
-						var letter = stream.ReadSpacedLetter();
-						switch (letter)
-						{
-							case 'P':
-								obj.Condition = 100;
-								break;
-							case 'G':
-								obj.Condition = 90;
-								break;
-							case 'A':
-								obj.Condition = 75;
-								break;
-							case 'W':
-								obj.Condition = 50;
-								break;
-							case 'D':
-								obj.Condition = 25;
-								break;
-							case 'B':
-								obj.Condition = 10;
-								break;
-							case 'R':
-								obj.Condition = 0;
-								break;
-							default:
-								obj.Condition = 100;
-								break;
-						}
-					}
-				}
-
+				// Add race flags
 				while (!stream.EndOfStream())
 				{
 					var c = stream.ReadSpacedLetter();
 
-					if (c == 'A')
+					if (c == 'F')
 					{
-						var effect = new GameObjectEffect
-						{
-							EffectBitType = EffectBitType.Object,
-							EffectType = (EffectType)stream.ReadNumber(),
-							Modifier = stream.ReadNumber()
-						};
+						var word = stream.ReadWord();
+						var vector = stream.ReadFlag();
 
-						obj.Effects.Add(effect);
-					}
-					else if (c == 'F')
-					{
-						var effect = new GameObjectEffect();
-						c = stream.ReadSpacedLetter();
-						switch (c)
+						switch (word.Substring(0, 3).ToLower())
 						{
-							case 'A':
-								effect.EffectBitType = EffectBitType.None;
+							case "act":
+								flags &= (OldMobileFlags)(~vector);
 								break;
-							case 'I':
-								effect.EffectBitType = EffectBitType.Immunity;
+							case "aff":
+								affectedByFlags &= (OldAffectedByFlags)(~vector);
 								break;
-							case 'R':
-								effect.EffectBitType = EffectBitType.Resistance;
+							case "off":
+								offenseFlags &= (OldMobileOffensiveFlags)(~vector);
 								break;
-							case 'V':
-								effect.EffectBitType = EffectBitType.Vulnerability;
+							case "imm":
+								immuneFlags &= (OldResistanceFlags)(~vector);
+								break;
+							case "res":
+								resistanceFlags &= (OldResistanceFlags)(~vector);
+								break;
+							case "vul":
+								vulnerableFlags &= (OldResistanceFlags)(~vector);
+								break;
+							case "for":
+								formsFlags &= (FormFlags)(~vector);
+								break;
+							case "par":
+								partsFlags &= (PartFlags)(~vector);
 								break;
 							default:
-								stream.RaiseError($"Unable to parse effect bit '{c}'");
+								stream.RaiseError($"Unknown flag {word}");
 								break;
 						}
+					}
+					else if (c == 'M')
+					{
+						var word = stream.ReadWord();
+						var mnum = stream.ReadNumber();
+						var trig = stream.ReadDikuString();
 
-						effect.EffectType = (EffectType)stream.ReadNumber();
-						effect.Modifier = stream.ReadNumber();
-						effect.Bits = (AffectedByFlags)stream.ReadFlag();
-						obj.Effects.Add(effect);
+						Log("Warning: mob triggers are ignored.");
 					}
-					else if (c == 'E')
+					else
 					{
-						obj.ExtraKeyword = stream.ReadDikuString();
-						obj.ExtraDescription = stream.ReadDikuString();
+						stream.GoBackIfNotEOF();
+						break;
 					}
-					else if (c == 'L' || c == 'C')
-					{
-						var n = stream.ReadFlag();
-					}
-					else if (c == 'R' || c == 'D' || c == 'O' || c == 'X' || c == 'M' ||
-						c == 'Y' || c == 'J' || c == 'G' || c == 'K' || c == 'V' || c == 'P' || c == 'd')
-					{
-					}
-					else if (c == 'T')
+				}
+			}
+
+			// Set flags
+			mobile.Flags = flags.ToNewFlags();
+			var newOffensiveFlags = offenseFlags.ToNewFlags();
+			foreach (var f in newOffensiveFlags)
+			{
+				mobile.Flags.Add(f);
+			}
+
+			mobile.AffectedByFlags = affectedByFlags.ToNewFlags();
+			mobile.ImmuneFlags = immuneFlags.ToNewFlags();
+			mobile.ResistanceFlags = resistanceFlags.ToNewFlags();
+			mobile.VulnerableFlags = vulnerableFlags.ToNewFlags();
+
+			if (Settings.SourceType == SourceType.Circle)
+			{
+				// Optional triggers after the end of the room
+				while (!stream.EndOfStream())
+				{
+					var c = stream.ReadSpacedLetter();
+					if (c == 'T')
 					{
 						// Circle trigger
 						var n = stream.ReadNumber();
@@ -624,6 +372,301 @@ namespace DikuLoad.Import.Ascii
 						stream.GoBackIfNotEOF();
 						break;
 					}
+				}
+
+				if (Settings.SubSourceType == SubSourceType.Crimson)
+				{
+					var i = (int)flags;
+					if ((i & 8192) != 0 ||
+						(i & 16384) != 0 ||
+						(i & 32768) != 0)
+					{
+						mobile.Flags.Add(MobileFlags.Aggressive);
+					}
+
+					// Skip everything until next #
+					while (!stream.EndOfStream())
+					{
+						stream.SkipWhitespace();
+
+						var oldPos = stream.Position;
+						line = stream.ReadLine().Trim();
+						if (line.StartsWith("#") || line.StartsWith("$"))
+						{
+							stream.Seek(oldPos, SeekOrigin.Begin);
+							break;
+						}
+					}
+				}
+			}
+
+			return mobile;
+		}
+
+		private void ProcessMobiles(Stream stream, Area area)
+		{
+			while (!stream.EndOfStream())
+			{
+				var mobile = ProcessMobile(stream);
+
+				if (!CheckForbidden(mobile.Name))
+				{
+					area.Mobiles.Add(mobile);
+					AddMobileToCache(mobile.VNum, mobile);
+				}
+			}
+		}
+
+		private GameObject ProcessObject(Stream stream)
+		{
+			stream.SkipWhitespace();
+			var line = stream.ReadLine().Trim();
+			if (line.StartsWith("$"))
+			{
+				return null;
+			}
+
+			int vnum;
+			if (!int.TryParse(line.Substring(1), out vnum))
+			{
+				return null;
+			}
+			
+			var name = stream.ReadDikuString();
+			Log($"Processing object {name}...");
+
+			var obj = new GameObject
+			{
+				VNum = vnum,
+				Name = name,
+				ShortDescription = stream.ReadDikuString(),
+				Description = stream.ReadDikuString(),
+				Material = stream.ReadDikuString()
+			};
+
+			obj.ItemType = stream.ReadEnumFromWord<ItemType>();
+
+			if (Settings.SourceType == SourceType.Soulmud)
+			{
+				while(!stream.EndOfStream())
+				{
+					var c = stream.ReadByte();
+					if (c == '#')
+					{
+						stream.GoBackIfNotEOF();
+						break;
+					}
+				}
+
+				return obj;
+			}
+
+			if (Settings.SourceType == SourceType.Circle)
+			{
+				line = stream.ReadLine();
+				var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+				if (parts.Length >= 12)
+				{
+					// 3 flags, each followed by 3 zeroes
+					obj.ExtraFlags = (ItemExtraFlags)parts[0].Trim().ParseFlag();
+					obj.WearFlags = (ItemWearFlags)parts[4].Trim().ParseFlag();
+					obj.AffectedByFlags = ((OldAffectedByFlags)parts[8].ParseFlag(1)).ToNewFlags();
+				}
+				else
+				{
+					if (parts.Length > 0)
+					{
+						obj.ExtraFlags = (ItemExtraFlags)parts[0].Trim().ParseFlag();
+					}
+
+					if (parts.Length > 1)
+					{
+						obj.WearFlags = (ItemWearFlags)parts[1].Trim().ParseFlag();
+					}
+
+					if (parts.Length > 2)
+					{
+						obj.AffectedByFlags = ((OldAffectedByFlags)parts[2].ParseFlag(1)).ToNewFlags();
+					}
+				}
+			}
+			else
+			{
+				obj.ExtraFlags = (ItemExtraFlags)stream.ReadFlag();
+				obj.WearFlags = (ItemWearFlags)stream.ReadFlag();
+			}
+
+			if (Settings.SourceType == SourceType.Circle)
+			{
+				obj.Value1 = stream.ReadWord();
+				obj.Value2 = stream.ReadWord();
+				obj.Value3 = stream.ReadWord();
+				obj.Value4 = stream.ReadWord();
+
+				// Rest
+				line = stream.ReadLine();
+				var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+				if (parts.Length > 0)
+				{
+					obj.Weight = int.Parse(parts[0].Trim());
+				}
+
+				if (parts.Length > 1)
+				{
+					obj.Cost = int.Parse(parts[1].Trim());
+				}
+
+				if (parts.Length > 3)
+				{
+					obj.Level = int.Parse(parts[3].Trim());
+				}
+			}
+			else if (Settings.SourceType == SourceType.ROM)
+			{
+				if (obj.ItemType == ItemType.Armor)
+				{
+					obj.Value1 = stream.ReadFlag().ToString();
+				}
+				else
+				{
+					obj.Value1 = stream.ReadWord();
+				}
+				obj.Value2 = stream.ReadWord();
+				obj.Value3 = stream.ReadWord();
+				obj.Value4 = stream.ReadWord();
+				obj.Value5 = stream.ReadWord();
+				obj.Level = stream.ReadNumber();
+			}
+			else
+			{
+				obj.Value1 = stream.ReadDikuString();
+				obj.Value2 = stream.ReadDikuString();
+				obj.Value3 = stream.ReadDikuString();
+				obj.Value4 = stream.ReadDikuString();
+			}
+
+			if (Settings.SourceType != SourceType.Circle)
+			{
+				obj.Weight = stream.ReadNumber();
+				obj.Cost = stream.ReadNumber();
+
+				if (Settings.SourceType == SourceType.Envy)
+				{
+					obj.RentCost = stream.ReadNumber();
+				}
+				else
+				{
+					var letter = stream.ReadSpacedLetter();
+					switch (letter)
+					{
+						case 'P':
+							obj.Condition = 100;
+							break;
+						case 'G':
+							obj.Condition = 90;
+							break;
+						case 'A':
+							obj.Condition = 75;
+							break;
+						case 'W':
+							obj.Condition = 50;
+							break;
+						case 'D':
+							obj.Condition = 25;
+							break;
+						case 'B':
+							obj.Condition = 10;
+							break;
+						case 'R':
+							obj.Condition = 0;
+							break;
+						default:
+							obj.Condition = 100;
+							break;
+					}
+				}
+			}
+
+			while (!stream.EndOfStream())
+			{
+				var c = stream.ReadSpacedLetter();
+
+				if (c == 'A')
+				{
+					var effect = new GameObjectEffect
+					{
+						EffectBitType = EffectBitType.Object,
+						EffectType = (EffectType)stream.ReadNumber(),
+						Modifier = stream.ReadNumber()
+					};
+
+					obj.Effects.Add(effect);
+				}
+				else if (c == 'F')
+				{
+					var effect = new GameObjectEffect();
+					c = stream.ReadSpacedLetter();
+					switch (c)
+					{
+						case 'A':
+							effect.EffectBitType = EffectBitType.None;
+							break;
+						case 'I':
+							effect.EffectBitType = EffectBitType.Immunity;
+							break;
+						case 'R':
+							effect.EffectBitType = EffectBitType.Resistance;
+							break;
+						case 'V':
+							effect.EffectBitType = EffectBitType.Vulnerability;
+							break;
+						default:
+							stream.RaiseError($"Unable to parse effect bit '{c}'");
+							break;
+					}
+
+					effect.EffectType = (EffectType)stream.ReadNumber();
+					effect.Modifier = stream.ReadNumber();
+					effect.Bits = (AffectedByFlags)stream.ReadFlag();
+					obj.Effects.Add(effect);
+				}
+				else if (c == 'E')
+				{
+					obj.ExtraKeyword = stream.ReadDikuString();
+					obj.ExtraDescription = stream.ReadDikuString();
+				}
+				else if (c == 'L' || c == 'C')
+				{
+					var n = stream.ReadFlag();
+				}
+				else if (c == 'R' || c == 'D' || c == 'O' || c == 'X' || c == 'M' ||
+					c == 'Y' || c == 'J' || c == 'G' || c == 'K' || c == 'V' || c == 'P' || c == 'd')
+				{
+				}
+				else if (c == 'T')
+				{
+					// Circle trigger
+					var n = stream.ReadNumber();
+				}
+				else
+				{
+					stream.GoBackIfNotEOF();
+					break;
+				}
+			}
+
+			return obj;
+		}
+
+		private void ProcessObjects(Stream stream, Area area)
+		{
+			while (!stream.EndOfStream())
+			{
+				var obj = ProcessObject(stream);
+				if (!CheckForbidden(obj.Name))
+				{
+					area.Objects.Add(obj);
+					AddObjectToCache(obj.VNum, obj);
 				}
 			}
 		}
@@ -640,7 +683,12 @@ namespace DikuLoad.Import.Ascii
 				}
 
 				var vnum = int.Parse(line.Substring(1));
-				if (vnum == 0 && Settings.SourceType != SourceType.Circle)
+				if (vnum == 0 && Settings.SourceType != SourceType.Circle && Settings.SourceType != SourceType.Soulmud)
+				{
+					break;
+				}
+
+				if (vnum == 9999999)
 				{
 					break;
 				}
@@ -655,7 +703,8 @@ namespace DikuLoad.Import.Ascii
 					Description = stream.ReadDikuString(),
 				};
 
-				if (!CheckForbidden(name))
+				if (!CheckForbidden(name) &&
+					!(Settings.SourceType == SourceType.Soulmud && room.Name == "Nothingness"))
 				{
 					area.Rooms.Add(room);
 					AddRoomToCache(vnum, room);
@@ -686,15 +735,65 @@ namespace DikuLoad.Import.Ascii
 					}
 					else if (c == 'H')
 					{
-						room.HealRate = stream.ReadNumber();
+						if (Settings.SourceType != SourceType.Soulmud)
+						{
+							room.HealRate = stream.ReadNumber();
+						}
+						else
+						{
+							var a = stream.ReadNumber();
+							var b = stream.ReadNumber();
+							var d = stream.ReadNumber();
+							var e = stream.ReadNumber();
+						}
 					}
 					else if (c == 'M')
 					{
-						room.ManaRate = stream.ReadNumber();
+						if (Settings.SourceType != SourceType.Soulmud)
+						{
+							room.ManaRate = stream.ReadNumber();
+						}
+						else
+						{
+							var a = stream.ReadNumber();
+							var mobVnum = stream.ReadNumber();
+							var d = stream.ReadNumber();
+
+							var mobile = GetMobileByVnum(mobVnum);
+							if (mobile == null)
+							{
+								Log($"Unable to find mobile with vnum {mobVnum}");
+							} else
+							{
+								var areaMobile = (from m in area.Mobiles where m.VNum == mobVnum select m).FirstOrDefault();
+								if (areaMobile == null)
+								{
+									area.Mobiles.Add(mobile);
+								}
+
+								var mobileSpawn = new AreaReset
+								{
+									ResetType = AreaResetType.NPC,
+									MobileVNum = mobVnum,
+									Value4 = vnum
+								};
+
+								area.Resets.Add(mobileSpawn);
+							}
+						}
 					}
 					else if (c == 'C')
 					{
-						string clan = stream.ReadDikuString();
+						if (Settings.SourceType != SourceType.Soulmud)
+						{
+							string clan = stream.ReadDikuString();
+						}
+						else
+						{
+							var a = stream.ReadNumber();
+							var b = stream.ReadNumber();
+							var d = stream.ReadNumber();
+						}
 					}
 					else if (c == 'D')
 					{
@@ -789,7 +888,7 @@ namespace DikuLoad.Import.Ascii
 
 						var exitInfo = new RoomExitInfo
 						{
-							SourceRoom = room,	
+							SourceRoom = room,
 							RoomExit = exit
 						};
 
@@ -806,6 +905,12 @@ namespace DikuLoad.Import.Ascii
 							room.Exits[exit.Direction] = exit;
 						}
 
+						if (Settings.SourceType == SourceType.Soulmud)
+						{
+							var a = stream.ReadNumber();
+							var b = stream.ReadNumber();
+						}
+
 						AddRoomExitToCache(exitInfo);
 					}
 					else if (c == 'E')
@@ -815,7 +920,45 @@ namespace DikuLoad.Import.Ascii
 					}
 					else if (c == 'O')
 					{
-						room.Owner = stream.ReadDikuString();
+						if (Settings.SourceType != SourceType.Soulmud)
+						{
+							room.Owner = stream.ReadDikuString();
+						} else
+						{
+							var a = stream.ReadNumber();
+							var b = stream.ReadNumber();
+							var d = stream.ReadNumber();
+						}
+					}
+					else if (c == 'Z')
+					{
+						var a = stream.ReadNumber();
+						var b = stream.ReadNumber();
+						var d = stream.ReadNumber();
+						var e = stream.ReadNumber();
+					}
+					else if (c == 'Q' || c == 'K')
+					{
+						var a = stream.ReadNumber();
+						var b = stream.ReadNumber();
+						var d = stream.ReadNumber();
+						var e = stream.ReadNumber();
+					}
+					else if (c == 'R')
+					{
+						var a = stream.ReadNumber();
+						var b = stream.ReadNumber();
+						var d = stream.ReadNumber();
+						var e = stream.ReadNumber();
+						var f = stream.ReadNumber();
+						var g = stream.ReadNumber();
+						var h = stream.ReadNumber();
+					}
+					else if (c == 'G' || c == 'I' || c == 'J')
+					{
+						var a = stream.ReadNumber();
+						var b = stream.ReadNumber();
+						var d = stream.ReadNumber();
 					}
 					else
 					{
@@ -868,7 +1011,7 @@ namespace DikuLoad.Import.Ascii
 
 				var parts = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
 
-				for(var i = 0; i < parts.Length; ++i)
+				for (var i = 0; i < parts.Length; ++i)
 				{
 					parts[i] = parts[i].Trim();
 				}
@@ -1313,11 +1456,12 @@ namespace DikuLoad.Import.Ascii
 			{
 				zonPath = Path.Combine(Settings.InputFolder, "zon");
 				zonPath = Path.Combine(zonPath, Path.ChangeExtension(areaFileName, "zon"));
-			}  else
+			}
+			else
 			{
 				zonPath = Path.ChangeExtension(wldFile, "zon");
 			}
-			
+
 			Area area;
 			if (File.Exists(zonPath))
 			{
@@ -1355,7 +1499,8 @@ namespace DikuLoad.Import.Ascii
 			{
 				objPath = Path.Combine(Settings.InputFolder, "obj");
 				objPath = Path.Combine(objPath, Path.ChangeExtension(areaFileName, "obj"));
-			} else
+			}
+			else
 			{
 				objPath = Path.ChangeExtension(wldFile, "obj");
 			}
@@ -1375,7 +1520,8 @@ namespace DikuLoad.Import.Ascii
 			{
 				mobPath = Path.Combine(Settings.InputFolder, "mob");
 				mobPath = Path.Combine(mobPath, Path.ChangeExtension(areaFileName, "mob"));
-			} else
+			}
+			else
 			{
 				mobPath = Path.ChangeExtension(wldFile, "mob");
 			}
@@ -1401,6 +1547,113 @@ namespace DikuLoad.Import.Ascii
 		{
 			Utility.RevertFlag = Settings.SourceType == SourceType.ROM;
 
+			if (Settings.SourceType == SourceType.Soulmud)
+			{
+				Dictionary<int, Mobile> allMobiles;
+
+				var jsonOptions = new JsonSerializerOptions
+				{
+					WriteIndented = true,
+					IncludeFields = true,
+					DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+				};
+
+				jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+				if (!File.Exists("allMobiles.json"))
+				{
+					// Load mobiles
+					var mobFolder = Path.Combine(Settings.InputFolder, "mobs");
+					var mobFiles = Directory.EnumerateFiles(mobFolder, "*.*", SearchOption.AllDirectories).ToArray();
+
+					allMobiles = new Dictionary<int, Mobile>();
+					foreach (var file in mobFiles)
+					{
+						Log($"Loading mobile {file}");
+						using (var stream = File.OpenRead(file))
+						{
+							var mobile = ProcessMobile(stream);
+							if (mobile == null)
+							{
+								Log("Not a mobile file");
+								continue;
+							}
+
+							allMobiles[mobile.VNum] = mobile;
+							AddMobileToCache(mobile.VNum, mobile);
+						}
+					}
+
+					var jsonData = JsonSerializer.Serialize(allMobiles, jsonOptions);
+					File.WriteAllText("allMobiles.json", jsonData);
+				} else
+				{
+					var jsonData = File.ReadAllText("allMobiles.json");
+					allMobiles = JsonSerializer.Deserialize<Dictionary<int, Mobile>>(jsonData, jsonOptions);
+
+					foreach(var pair in allMobiles)
+					{
+						AddMobileToCache(pair.Key, pair.Value);
+					}
+				}
+
+				var objFiles = Directory.EnumerateFiles(Settings.InputFolder).ToArray();
+				foreach (var objFile in objFiles)
+				{
+					if (!objFile.StartsWith("w.obj"))
+					{
+						continue;
+					}
+
+					Log($"Processing obj file {objFile}");
+					using (var stream = File.OpenRead(objFile))
+					{
+						while (!stream.EndOfStream())
+						{
+							var obj = ProcessObject(stream);
+							if (obj == null)
+							{
+								break;
+							}
+
+							AddObjectToCache(obj.VNum, obj);
+						}
+					}
+				}
+
+				var wldFolder = Path.Combine(Settings.InputFolder, "wld");
+				var indexFile = Path.Combine(wldFolder, "area.lst");
+				var indexData = File.ReadAllText(indexFile);
+				var lines = indexData.Split("\n");
+
+				foreach (var line in lines)
+				{
+					var parts = line.Split(' ');
+					var areaFileName = parts[0];
+					if (!areaFileName.EndsWith(".are"))
+					{
+						continue;
+					}
+
+					var wldFile = Path.Combine(wldFolder, areaFileName);
+
+					using (var stream = File.OpenRead(wldFile))
+					{
+						Log($"Processing area {wldFile}...");
+						var l = stream.ReadLine();
+						var area = new Area
+						{
+							Filename = areaFileName,
+							Name = Path.GetFileNameWithoutExtension(areaFileName),
+						};
+
+						ProcessRooms(stream, area);
+
+						Areas.Add(area);
+					}
+				}
+			}
+			else
 			if (Settings.SourceType != SourceType.Circle)
 			{
 				var areaFiles = Directory.EnumerateFiles(Settings.InputFolder, "*.are", SearchOption.AllDirectories).ToArray();
@@ -1434,13 +1687,14 @@ namespace DikuLoad.Import.Ascii
 					var wldFile = Path.Combine(wldFolder, areaFileName);
 					ProcessCircleArea(wldFile);
 				}
-			} else
+			}
+			else
 			{
 				// Crimson
 				var zonesFile = Path.Combine(Settings.InputFolder, "zones.tbl");
 
 				_crimsonZones.Clear();
-				using(var stream = File.OpenRead(zonesFile))
+				using (var stream = File.OpenRead(zonesFile))
 				{
 					while (!stream.EndOfStream())
 					{
@@ -1460,7 +1714,7 @@ namespace DikuLoad.Import.Ascii
 				}
 
 				var areaFiles = Directory.EnumerateFiles(Path.Combine(Settings.InputFolder, "areas"), "*.wld", SearchOption.AllDirectories).ToArray();
-				foreach(var wldFile  in areaFiles)
+				foreach (var wldFile in areaFiles)
 				{
 					ProcessCircleArea(wldFile);
 				}

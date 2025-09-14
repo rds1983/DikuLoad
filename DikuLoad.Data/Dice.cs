@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace DikuLoad.Data
 {
@@ -7,14 +9,20 @@ namespace DikuLoad.Data
 		private static readonly Regex Expr1 = new Regex(@"^\s*(\d+)d(\d+)\s*$");
 		private static readonly Regex Expr2 = new Regex(@"^\s*(\d+)d(\d+)\s*\+\s*(\d+)\s*$");
 
-		public int Sides { get; set; }
-		public int Count { get; set; }
-		public int Bonus { get; set; }
+		public int Sides;
+		public int Count;
+		public int Bonus;
 
+		[JsonIgnore]
 		public bool IsZero => Sides == 0 && Count == 0 && Bonus == 0;
 
+		[JsonIgnore]
 		public int Minimum => Count + Bonus;
+
+		[JsonIgnore]
 		public int Maximum => Count * Sides + Bonus;
+
+		[JsonIgnore]
 		public int Average => Minimum + (Maximum - Minimum) / 2;
 
 		public Dice(int sides, int count, int bonus)
@@ -42,6 +50,18 @@ namespace DikuLoad.Data
 			}
 
 			return null;
+		}
+
+		public static Dice EnsureParse(string expr)
+		{
+			var result = Parse(expr);
+
+			if (result == null)
+			{
+				throw new Exception($"Couldn't parse dice expression {expr}");
+			}
+
+			return result.Value;
 		}
 	}
 }

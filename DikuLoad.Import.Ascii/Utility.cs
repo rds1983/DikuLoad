@@ -10,53 +10,10 @@ namespace DikuLoad.Import.Ascii
 	internal static class Utility
 	{
 		private static Regex RegexColorRemover = new Regex(@"\&\w");
-		private static readonly Dictionary<OldRoomFlags, RoomFlags> _roomFlagsMapper = new Dictionary<OldRoomFlags, RoomFlags>();
-		private static readonly Dictionary<OldRoomExitFlags, RoomExitFlags> _roomExitFlagsMapper = new Dictionary<OldRoomExitFlags, RoomExitFlags>();
-		private static readonly Dictionary<OldMobileFlags, MobileFlags> _mobileFlagsMapper = new Dictionary<OldMobileFlags, MobileFlags>();
-		private static readonly Dictionary<OldMobileOffensiveFlags, MobileFlags> _offensiveMobileFlagsMapper = new Dictionary<OldMobileOffensiveFlags, MobileFlags>();
-		private static readonly Dictionary<OldResistanceFlags, ResistanceFlags> _resistanceFlagsMapper = new Dictionary<OldResistanceFlags, ResistanceFlags>();
-		private static readonly Dictionary<OldAffectedByFlags, AffectedByFlags> _affectedByFlagsMapper = new Dictionary<OldAffectedByFlags, AffectedByFlags>();
 
 		public static bool RevertFlag = false;
 
 
-
-		static Utility()
-		{
-			PopulateMapper(_roomFlagsMapper);
-
-			PopulateMapper(_roomExitFlagsMapper);
-			_roomExitFlagsMapper[OldRoomExitFlags.BashProof] = RoomExitFlags.NoBash;
-
-			PopulateMapper(_mobileFlagsMapper);
-			_mobileFlagsMapper[OldMobileFlags.StayInArea] = MobileFlags.StayArea;
-
-			PopulateMapper(_offensiveMobileFlagsMapper);
-			_offensiveMobileFlagsMapper[OldMobileOffensiveFlags.KickDirt] = MobileFlags.DirtKick;
-
-			PopulateMapper(_affectedByFlagsMapper);
-
-			PopulateMapper(_resistanceFlagsMapper);
-		}
-
-		private static void PopulateMapper<T2, T>(Dictionary<T2, T> mapper) where T : struct, Enum where T2 : struct, Enum
-		{
-			foreach (T2 flag in Enum.GetValues(typeof(T2)))
-			{
-				if ((int)(object)flag == 0)
-				{
-					continue;
-				}
-
-				var name = flag.ToString();
-
-				T newFlag;
-				if (Enum.TryParse(name, true, out newFlag))
-				{
-					mapper[flag] = newFlag;
-				}
-			}
-		}
 
 		public static void RaiseError(this Stream stream, string message)
 		{
@@ -213,7 +170,8 @@ namespace DikuLoad.Import.Ascii
 							if (char.IsLower(c))
 							{
 								c = char.ToUpper(c);
-							} else if (char.IsUpper(c))
+							}
+							else if (char.IsUpper(c))
 							{
 								c = char.ToLower(c);
 							}
@@ -260,7 +218,7 @@ namespace DikuLoad.Import.Ascii
 			{
 				return sb.ToString().ParseFlag(asciiAddition);
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				stream.RaiseError(ex.Message);
 			}
@@ -332,7 +290,7 @@ namespace DikuLoad.Import.Ascii
 			}
 
 			var result = sb.ToString();
-			
+
 			// Strip of colors
 			result = RegexColorRemover.Replace(result, string.Empty);
 
@@ -485,31 +443,28 @@ namespace DikuLoad.Import.Ascii
 			return true;
 		}
 
-		private static HashSet<T> ConvertFlags<T, T2>(Dictionary<T2, T> mapper, T2 flags) where T2 : struct, Enum
+		private static HashSet<T2> ConvertFlags<T, T2>(this T flags)
+			where T : struct, Enum
+			where T2 : struct, Enum
 		{
-			var result = new HashSet<T>();
+			var result = new HashSet<T2>();
 
-			if ((int)(object)flags == 0)
+			if (Convert.ToInt64(flags) == 0)
 			{
 				// None
-				return new HashSet<T>();
+				return result;
 			}
 
-			foreach (T2 flag in Enum.GetValues(typeof(T2)))
+			foreach (T flag in Enum.GetValues(typeof(T)))
 			{
-				if ((int)(object)flag == 0)
+				if (Convert.ToInt64(flag) == 0)
 				{
 					continue;
 				}
 
 				if (flags.HasFlag(flag))
 				{
-					T newFlag;
-					if (!mapper.TryGetValue(flag, out newFlag))
-					{
-						throw new Exception($"Unable to find the corresponding flag for {flag}");
-					}
-
+					var newFlag = Enum.Parse<T2>(flag.ToString(), true);
 					result.Add(newFlag);
 				}
 			}
@@ -517,13 +472,29 @@ namespace DikuLoad.Import.Ascii
 			return result;
 		}
 
-		public static HashSet<RoomFlags> ToNewFlags(this OldRoomFlags flags) => ConvertFlags(_roomFlagsMapper, flags);
-		public static HashSet<RoomExitFlags> ToNewFlags(this OldRoomExitFlags flags) => ConvertFlags(_roomExitFlagsMapper, flags);
-		public static HashSet<MobileFlags> ToNewFlags(this OldMobileFlags flags) => ConvertFlags(_mobileFlagsMapper, flags);
-		public static HashSet<MobileFlags> ToNewFlags(this OldMobileOffensiveFlags flags) => ConvertFlags(_offensiveMobileFlagsMapper, flags);
-		public static HashSet<ResistanceFlags> ToNewFlags(this OldResistanceFlags flags) => ConvertFlags(_resistanceFlagsMapper, flags);
-		public static HashSet<AffectedByFlags> ToNewFlags(this OldAffectedByFlags flags) => ConvertFlags(_affectedByFlagsMapper, flags);
+		public static HashSet<MobileFlags> ToNewFlags(this DikuMobileFlags flags) =>
+			flags.ConvertFlags<DikuMobileFlags, MobileFlags>();
 
+		public static HashSet<MobileFlags> ToNewFlags(this SoulMUDMobileFlags flags) =>
+			flags.ConvertFlags<SoulMUDMobileFlags, MobileFlags>();
+
+		public static HashSet<MobileFlags> ToNewFlags(this OldMobileOffensiveFlags flags) =>
+			flags.ConvertFlags<OldMobileOffensiveFlags, MobileFlags>();
+
+		public static HashSet<AffectedByFlags> ToNewFlags(this OldAffectedByFlags flags) =>
+			flags.ConvertFlags<OldAffectedByFlags, AffectedByFlags>();
+
+		public static HashSet<AffectedByFlags> ToNewFlags(this SoulMUDAffectedByFlags flags) =>
+			flags.ConvertFlags<SoulMUDAffectedByFlags, AffectedByFlags>();
+
+		public static HashSet<ResistanceFlags> ToNewFlags(this OldResistanceFlags flags) =>
+			flags.ConvertFlags<OldResistanceFlags, ResistanceFlags>();
+
+		public static HashSet<RoomFlags> ToNewFlags(this OldRoomFlags flags) =>
+			flags.ConvertFlags<OldRoomFlags, RoomFlags>();
+
+		public static HashSet<RoomExitFlags> ToNewFlags(this OldRoomExitFlags flags) =>
+			flags.ConvertFlags<OldRoomExitFlags, RoomExitFlags>();
 
 		public static Alignment ToAlignment(this int align)
 		{

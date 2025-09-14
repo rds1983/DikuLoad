@@ -124,14 +124,11 @@ namespace DikuLoad.Import.CSL
 					AffectedByFlags = mobileElement.ParseFlags<AffectedByFlags>("affectedBy"),
 					Alignment = mobileElement.EnsureEnum<Alignment>("alignment"),
 					Level = mobileElement.EnsureInt("level"),
-					HitRoll = mobileElement.EnsureInt("hitroll"),
 					HitDice = mobileElement.EnsureDice("HitPointDice"),
-					DamageDice = mobileElement.GetDice("DamageDice", new Dice(1, 1, 1)),
 					ManaDice = mobileElement.EnsureDice("ManaPointDice"),
 					ImmuneFlags = mobileElement.ParseFlags<ResistanceFlags>("immune"),
 					ResistanceFlags = mobileElement.ParseFlags<ResistanceFlags>("resist"),
 					VulnerableFlags = mobileElement.ParseFlags<ResistanceFlags>("vulnerable"),
-					AttackType = mobileElement.GetString("WeaponDamageMessage"),
 					Position = mobileElement.GetString("DefaultPosition"),
 					Sex = mobileElement.GetString("Sex"),
 					Size = mobileElement.GetString("Size"),
@@ -141,6 +138,10 @@ namespace DikuLoad.Import.CSL
 					ArmorClassSlash = mobileElement.EnsureInt("ArmorSlash"),
 					ArmorClassExotic = mobileElement.EnsureInt("ArmorExotic"),
 				};
+
+				mobile.SetAttack(mobileElement.GetString("WeaponDamageMessage"),
+					mobileElement.EnsureInt("hitroll"),
+					mobileElement.GetDice("DamageDice", new Dice(1, 1, 1)));
 
 				var gold = mobileElement.GetInt("gold", 0);
 				var silver = mobileElement.GetInt("silver", 0);

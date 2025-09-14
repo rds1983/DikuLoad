@@ -10,6 +10,43 @@ namespace DikuLoad.Import.Ascii
 {
 	public class Importer : BaseImporter
 	{
+		private static readonly string[] SoulMUDAttackTypes = new string[]
+		{
+			"hit",
+			"hit",
+			"whip",
+			"slash",
+			"zap",
+			"hit",
+			"crush",
+			"bludgeon",
+			"claw",
+			"bite",
+			"sting",
+			"pierce",
+			"stab",
+			"cleave",
+			"rake",
+			"beat",
+			"slice",
+			"slam",
+			"musicWave",
+			"bulletWave",
+			"acid",
+			"earth",
+			"rangeweapon",
+			"bullseye",
+			"pistolweapon",
+			"musicweapon",
+			"fire",
+			"ice",
+			"snipe",
+			"concerto",
+			"dirge",
+			"singingArrow",
+			"singingSword",
+		};
+
 		private readonly HashSet<string> _crimsonZones = new HashSet<string>();
 
 		public ImporterSettings Settings { get; private set; }
@@ -152,8 +189,8 @@ namespace DikuLoad.Import.Ascii
 				mobile.Race = stream.ReadDikuString();
 			}
 
-			OldMobileFlags flags = 0;
-			OldAffectedByFlags affectedByFlags = 0;
+			long flags = 0;
+			long affectedByFlags = 0;
 
 			var isCircleSimpleMob = true;
 			if (Settings.SourceType == SourceType.Circle)
@@ -170,27 +207,27 @@ namespace DikuLoad.Import.Ascii
 				if (parts.Length == 4)
 				{
 					// Old circle mud
-					flags = (OldMobileFlags)parts[0].ParseFlag();
-					affectedByFlags = (OldAffectedByFlags)parts[1].ParseFlag();
+					flags = parts[0].ParseFlag();
+					affectedByFlags = parts[1].ParseFlag();
 					mobile.Alignment = int.Parse(parts[2]).ToAlignment();
 				}
 				else if (parts.Length == 10)
 				{
-					flags = (OldMobileFlags)parts[0].ParseFlag();
-					affectedByFlags = (OldAffectedByFlags)parts[4].ParseFlag();
+					flags = parts[0].ParseFlag();
+					affectedByFlags = parts[4].ParseFlag();
 					mobile.Alignment = int.Parse(parts[8]).ToAlignment();
 				}
 				else
 				{
-					flags = (OldMobileFlags)parts[0].ParseFlag();
+					flags = parts[0].ParseFlag();
 					Log($"Warning: mob #{vnum} parameter count is neither 4, neither 10. Skipping that string.");
 				}
 			}
 			else
 			{
 
-				flags = (OldMobileFlags)stream.ReadFlag();
-				affectedByFlags = (OldAffectedByFlags)stream.ReadFlag();
+				flags = stream.ReadFlag();
+				affectedByFlags = stream.ReadFlag();
 
 				mobile.Alignment = stream.ReadNumber().ToAlignment();
 
@@ -210,7 +247,7 @@ namespace DikuLoad.Import.Ascii
 			}
 
 			mobile.Level = stream.ReadNumber();
-			mobile.HitRoll = stream.ReadNumber();
+			var hit = stream.ReadNumber();
 
 			if (Settings.SourceType != SourceType.ROM)
 			{
@@ -224,64 +261,82 @@ namespace DikuLoad.Import.Ascii
 				mobile.ManaDice = stream.ReadDice();
 			}
 
-			mobile.DamageDice = stream.ReadDice();
-
 			var offenseFlags = OldMobileOffensiveFlags.None;
 			var immuneFlags = OldResistanceFlags.None;
 			var resistanceFlags = OldResistanceFlags.None;
 			var vulnerableFlags = OldResistanceFlags.None;
 			var formsFlags = FormFlags.None;
 			var partsFlags = PartFlags.None;
-			if (Settings.SourceType == SourceType.ROM)
+
+			if (Settings.SourceType == SourceType.Soulmud)
 			{
-				mobile.AttackType = stream.ReadWord();
-				mobile.ArmorClassPierce = stream.ReadNumber();
-				mobile.ArmorClassBash = stream.ReadNumber();
-				mobile.ArmorClassSlash = stream.ReadNumber();
-				mobile.ArmorClassExotic = stream.ReadNumber();
-
-
-				offenseFlags = (OldMobileOffensiveFlags)stream.ReadFlag();
-				immuneFlags = (OldResistanceFlags)stream.ReadFlag();
-				resistanceFlags = (OldResistanceFlags)stream.ReadFlag();
-				vulnerableFlags = (OldResistanceFlags)stream.ReadFlag();
-
-				mobile.StartPosition = stream.ReadWord();
-				mobile.Position = stream.ReadWord();
-				mobile.Sex = stream.ReadWord();
-				mobile.Wealth = stream.ReadNumber();
-				mobile.FormFlags = (FormFlags)stream.ReadFlag();
-				mobile.PartFlags = (PartFlags)stream.ReadFlag();
-				mobile.Size = stream.ReadWord();
-				mobile.Material = stream.ReadWord();
-			}
-			else if (Settings.SourceType == SourceType.Envy)
-			{
-				mobile.Wealth = stream.ReadNumber();
-				mobile.Xp = stream.ReadNumber();
-				mobile.Position = stream.ReadWord();
-				mobile.Race = stream.ReadDikuString();
-				mobile.Sex = stream.ReadWord();
-			}
-			else if (Settings.SourceType == SourceType.Circle)
-			{
-				mobile.Wealth = stream.ReadNumber();
-				mobile.Xp = stream.ReadNumber();
-				mobile.StartPosition = stream.ReadWord();
-				mobile.Position = stream.ReadWord();
-				mobile.Sex = stream.ReadWord();
-
-				if (!isCircleSimpleMob)
+				var l = stream.ReadLine();
+				var parts = l.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+				for (var i = 0; i < parts.Length; i += 2)
 				{
-					while (!stream.EndOfStream())
+					var dice = Dice.EnsureParse(parts[i]);
+					var attackType = SoulMUDAttackTypes[int.Parse(parts[i + 1])];
+
+					var attack = new Attack(attackType, hit, dice);
+					mobile.Attacks.Add(attack);
+				}
+			}
+			else
+			{
+				var damageDice = stream.ReadDice();
+				var attackType = "hit";
+				if (Settings.SourceType == SourceType.ROM)
+				{
+					attackType = stream.ReadWord();
+					mobile.ArmorClassPierce = stream.ReadNumber();
+					mobile.ArmorClassBash = stream.ReadNumber();
+					mobile.ArmorClassSlash = stream.ReadNumber();
+					mobile.ArmorClassExotic = stream.ReadNumber();
+
+					offenseFlags = (OldMobileOffensiveFlags)stream.ReadFlag();
+					immuneFlags = (OldResistanceFlags)stream.ReadFlag();
+					resistanceFlags = (OldResistanceFlags)stream.ReadFlag();
+					vulnerableFlags = (OldResistanceFlags)stream.ReadFlag();
+
+					mobile.StartPosition = stream.ReadWord();
+					mobile.Position = stream.ReadWord();
+					mobile.Sex = stream.ReadWord();
+					mobile.Wealth = stream.ReadNumber();
+					mobile.FormFlags = (FormFlags)stream.ReadFlag();
+					mobile.PartFlags = (PartFlags)stream.ReadFlag();
+					mobile.Size = stream.ReadWord();
+					mobile.Material = stream.ReadWord();
+				}
+				else if (Settings.SourceType == SourceType.Envy)
+				{
+					mobile.Wealth = stream.ReadNumber();
+					mobile.Xp = stream.ReadNumber();
+					mobile.Position = stream.ReadWord();
+					mobile.Race = stream.ReadDikuString();
+					mobile.Sex = stream.ReadWord();
+				}
+				else if (Settings.SourceType == SourceType.Circle)
+				{
+					mobile.Wealth = stream.ReadNumber();
+					mobile.Xp = stream.ReadNumber();
+					mobile.StartPosition = stream.ReadWord();
+					mobile.Position = stream.ReadWord();
+					mobile.Sex = stream.ReadWord();
+
+					if (!isCircleSimpleMob)
 					{
-						line = stream.ReadLine().Trim();
-						if (line == "E")
+						while (!stream.EndOfStream())
 						{
-							break;
+							line = stream.ReadLine().Trim();
+							if (line == "E")
+							{
+								break;
+							}
 						}
 					}
 				}
+
+				mobile.SetAttack(attackType, hit, damageDice);
 			}
 
 			if (Settings.SourceType == SourceType.ROM)
@@ -299,10 +354,10 @@ namespace DikuLoad.Import.Ascii
 						switch (word.Substring(0, 3).ToLower())
 						{
 							case "act":
-								flags &= (OldMobileFlags)(~vector);
+								flags &= (~vector);
 								break;
 							case "aff":
-								affectedByFlags &= (OldAffectedByFlags)(~vector);
+								affectedByFlags &= (~vector);
 								break;
 							case "off":
 								offenseFlags &= (OldMobileOffensiveFlags)(~vector);
@@ -344,14 +399,29 @@ namespace DikuLoad.Import.Ascii
 			}
 
 			// Set flags
-			mobile.Flags = flags.ToNewFlags();
+			if (Settings.SourceType != SourceType.Soulmud)
+			{
+				mobile.Flags = ((DikuMobileFlags)flags).ToNewFlags();
+			} else
+			{
+				mobile.Flags = ((SoulMUDMobileFlags)flags).ToNewFlags();
+			}
+
 			var newOffensiveFlags = offenseFlags.ToNewFlags();
 			foreach (var f in newOffensiveFlags)
 			{
 				mobile.Flags.Add(f);
 			}
 
-			mobile.AffectedByFlags = affectedByFlags.ToNewFlags();
+
+			if (Settings.SourceType != SourceType.Soulmud)
+			{
+				mobile.AffectedByFlags = ((OldAffectedByFlags)affectedByFlags).ToNewFlags();
+			}
+			else
+			{
+				mobile.AffectedByFlags = ((SoulMUDAffectedByFlags)affectedByFlags).ToNewFlags();
+			}
 			mobile.ImmuneFlags = immuneFlags.ToNewFlags();
 			mobile.ResistanceFlags = resistanceFlags.ToNewFlags();
 			mobile.VulnerableFlags = vulnerableFlags.ToNewFlags();

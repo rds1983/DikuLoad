@@ -52,12 +52,20 @@ namespace DikuLoad.Data
 		AssistAll,
 		AssistGuard,
 		AssistId,
-
-		AssistPlayers = AssistPlayer,
-		Train = GuildMaster,
-		IsHealer = Healer,
-		IsChanger = Changer,
-		AssistVNum = AssistId,
+		NoKill,
+		Spec,
+		NiceThief,
+		Berserker,
+		Pound,
+		Slice,
+		Stab,
+		Pierce,
+		Cleave,
+		Beat,
+		Slash,
+		Rake,
+		Whip,
+		Zap,
 	}
 
 	public enum AffectedByFlags
@@ -77,8 +85,8 @@ namespace DikuLoad.Data
 		DarkVision,
 		AcuteVision,
 		Sneak,
-		ProtectionEvil,
-		ProtectionGood,
+		ProtectEvil,
+		ProtectGood,
 		Plague,
 		Berserk,
 		Invisible,
@@ -94,10 +102,26 @@ namespace DikuLoad.Data
 		Charm,
 		Sleep,
 		Calm,
-
-		ProtectEvil = ProtectionEvil,
-		ProtectGood = ProtectionGood,
-		Blindness = Blind,
+		Liquid,
+		AirElm,
+		NoBlast,
+		NoStab,
+		Aether,
+		WaterElm,
+		HealHurts,
+		EarthElm,
+		Ethereal,
+		Frozen,
+		ResistWebs,
+		FireElm,
+		Aegis,
+		Ride,
+		Drowning,
+		Infravision,
+		Gate,
+		Climb,
+		Group,
+		Astral,
 	}
 
 	public enum ResistanceFlags
@@ -212,6 +236,20 @@ namespace DikuLoad.Data
 		Evil
 	}
 
+	public class Attack
+	{
+		public string AttackType { get; set; }
+		public int Hit { get; set; }
+		public Dice DamageDice;
+
+		public Attack(string attackType, int hit, Dice damageDice)
+		{
+			AttackType = attackType;
+			Hit = hit;
+			DamageDice = damageDice;
+		}
+	}
+
 	public class Mobile : AreaEntity
 	{
 		public string Name { get; set; }
@@ -224,13 +262,10 @@ namespace DikuLoad.Data
 		public Alignment Alignment { get; set; }
 		public int Group { get; set; }
 		public int Level { get; set; }
-		public int HitRoll { get; set; }
 		public int ArmorClass { get; set; }
 		public Dice HitDice { get; set; }
 		public Dice ManaDice { get; set; }
-		public Dice DamageDice { get; set; }
 		public string Guild { get; set; }
-		public string AttackType { get; set; }
 		public int ArmorClassPierce { get; set; }
 		public int ArmorClassBash { get; set; }
 		public int ArmorClassSlash { get; set; }
@@ -249,6 +284,7 @@ namespace DikuLoad.Data
 		public string Material { get; set; }
 
 		public Shop Shop { get; set; }
+		public List<Attack> Attacks { get; set; } = new List<Attack>();
 		public List<MobileSpecialAttack> SpecialAttacks { get; set; }
 
 		public Mobile()
@@ -259,6 +295,14 @@ namespace DikuLoad.Data
 			ResistanceFlags = new HashSet<ResistanceFlags>();
 			VulnerableFlags = new HashSet<ResistanceFlags>();
 			SpecialAttacks = new List<MobileSpecialAttack>();
+		}
+
+		public void SetAttack(string attackType, int hit, Dice damageDice)
+		{
+			Attacks.Clear();
+
+			var attack = new Attack(attackType, hit, damageDice);
+			Attacks.Add(attack);
 		}
 
 		public override string ToString() => $"{ShortDescription} (#{VNum})";

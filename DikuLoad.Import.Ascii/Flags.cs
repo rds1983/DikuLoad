@@ -40,14 +40,14 @@ namespace DikuLoad.Import.Ascii
 	}
 
 	[Flags]
-	public enum OldMobileFlags
+	public enum DikuMobileFlags
 	{
 		None = 0,
 		Npc = 1 << 0,
 		Sentinel = 1 << 1,
 		Scavenger = 1 << 2,
 		Aggressive = 1 << 5,
-		StayInArea = 1 << 6,
+		StayArea = 1 << 6,
 		Wimpy = 1 << 7,
 		Pet = 1 << 8,
 		Train = 1 << 9,
@@ -66,6 +66,37 @@ namespace DikuLoad.Import.Ascii
 		UpdateAlways = 1 << 28,
 		IsChanger = 1 << 29,
 		FriendlyBits = Train | Practice | IsHealer | IsChanger
+	}
+
+	[Flags]
+	public enum SoulMUDMobileFlags
+	{
+		None = 0,
+		Spec = 1 << 0,
+		Sentinel = 1 << 1,
+		Scavenger = 1 << 2,
+		Npc = 1 << 3,
+		NiceThief = 1 << 4,
+		Aggressive = 1 << 5,
+		StayArea = 1 << 6,
+		Wimpy = 1 << 7,
+		Mage = 1 << 8,
+		Cleric = 1 << 9,
+		Thief = 1 << 10,
+		Warrior = 1 << 11,
+		Pierce = 1 << 12,
+		Slash = 1 << 13,
+		Crush = 1 << 14,
+		Whip = 1 << 15,
+		Pound = 1 << 16,
+		Beat = 1 << 17,
+		Stab = 1 << 18,
+		Cleave = 1 << 19,
+		Rake = 1 << 20,
+		Slice = 1 << 21,
+		NoKill = 1 << 22,
+		Zap = 1 << 23,
+		Berserker = 1 << 24
 	}
 
 	[Flags]
@@ -157,5 +188,50 @@ namespace DikuLoad.Import.Ascii
 		Swim = 1 << 27,
 		Regeneration = 1 << 28,
 		Slow = 1 << 29,
+	}
+
+	[Flags]
+	public enum SoulMUDAffectedByFlags: long
+	{
+		None = 0,
+		Blindness = 1 << 0,
+		Invisible = 1 << 1,
+		DetectEvil = 1 << 2,
+		DetectInvis = 1 << 3,
+		DetectMagic = 1 << 4,
+		DetectHidden = 1 << 5,
+		HealHurts = 1 << 6,
+		Sanctuary = 1 << 7,
+		Group = 1 << 8,
+		Infrared = 1 << 9,
+		Gate = 1 << 9,
+		Curse = 1 << 10,
+		WaterElm = 1 << 11,
+		Poison = 1 << 12,
+		ProtectEvil = 1 << 13,
+		NoBlast = 1 << 14,
+		Drowning = 1 << 15,
+		FireElm = 1 << 16,
+		Sleep = 1 << 17,
+		AirElm = 1 << 18,
+		Sneak = 1 << 19,
+		Hide = 1 << 20,
+		EarthElm = 1 << 21,
+		Charm = 1 << 22,
+		Follow = 1 << 23,
+		Ethereal = 1 << 24,
+		Flying = 1 << 25,
+		Climb = 1 << 26,
+		Ride = 1 << 27,
+		NoStab = 1 << 28,
+		ResistWebs = 1 << 29,
+		Aegis = 1 << 30,
+		Gloom = 1 << 31,
+		Infravision = 1 << 32,
+		Astral = 1 << 33,
+		Aether = 1 << 34,
+		Liquid = 1 << 35,
+		Frozen = 1 << 36,
+		Alien = 1 << 37
 	}
 }

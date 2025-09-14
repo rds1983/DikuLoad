@@ -47,6 +47,31 @@ namespace DikuLoad.Import.Ascii
 			"singingSword",
 		};
 
+		private static readonly string[] SoulMUDSexes = new string[]
+		{
+			"Neutral",
+			"Male",
+			"Female"
+		};
+
+		public static readonly string[] SoulMUDPositions = new string[]
+		{
+			"dead",
+			"mortallyw",
+			"incap",
+			"stunned",
+			"sleeping",
+			"resting",
+			"sitting",
+			"crawling",
+			"fighting",
+			"standing",
+			"relaxing",
+			"aggression",
+			"meditation",
+			"ducking"
+		};
+
 		private readonly HashSet<string> _crimsonZones = new HashSet<string>();
 
 		public ImporterSettings Settings { get; private set; }
@@ -280,6 +305,22 @@ namespace DikuLoad.Import.Ascii
 					var attack = new Attack(attackType, hit, dice);
 					mobile.Attacks.Add(attack);
 				}
+
+				mobile.Wealth = stream.ReadNumber();
+				mobile.Xp = stream.ReadNumber();
+
+				mobile.Position = SoulMUDPositions[stream.ReadNumber()];
+				mobile.StartPosition = SoulMUDPositions[stream.ReadNumber()];
+
+				var sex = stream.ReadNumber();
+				if (sex >= SoulMUDSexes.Length)
+				{
+					sex = 0;
+				}
+				mobile.Sex = SoulMUDSexes[sex];
+
+				var size = stream.ReadNumber();
+				var proc = stream.ReadNumber();
 			}
 			else
 			{
@@ -402,7 +443,8 @@ namespace DikuLoad.Import.Ascii
 			if (Settings.SourceType != SourceType.Soulmud)
 			{
 				mobile.Flags = ((DikuMobileFlags)flags).ToNewFlags();
-			} else
+			}
+			else
 			{
 				mobile.Flags = ((SoulMUDMobileFlags)flags).ToNewFlags();
 			}
@@ -412,7 +454,6 @@ namespace DikuLoad.Import.Ascii
 			{
 				mobile.Flags.Add(f);
 			}
-
 
 			if (Settings.SourceType != SourceType.Soulmud)
 			{

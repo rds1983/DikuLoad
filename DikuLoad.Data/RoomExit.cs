@@ -40,9 +40,6 @@ namespace DikuLoad.Data
 
 		public HashSet<RoomExitFlags> Flags { get; set; }
 
-		public int? KeyObjectId { get; set; }
-
-
 		[JsonIgnore]
 		public GameObject KeyObject { get; set; }
 

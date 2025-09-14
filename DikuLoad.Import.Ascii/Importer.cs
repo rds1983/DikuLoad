@@ -431,7 +431,7 @@ namespace DikuLoad.Import.Ascii
 			{
 				return null;
 			}
-			
+
 			var name = stream.ReadDikuString();
 			Log($"Processing object {name}...");
 
@@ -448,7 +448,7 @@ namespace DikuLoad.Import.Ascii
 
 			if (Settings.SourceType == SourceType.Soulmud)
 			{
-				while(!stream.EndOfStream())
+				while (!stream.EndOfStream())
 				{
 					var c = stream.ReadByte();
 					if (c == '#')
@@ -763,7 +763,8 @@ namespace DikuLoad.Import.Ascii
 							if (mobile == null)
 							{
 								Log($"Unable to find mobile with vnum {mobVnum}");
-							} else
+							}
+							else
 							{
 								var areaMobile = (from m in area.Mobiles where m.VNum == mobVnum select m).FirstOrDefault();
 								if (areaMobile == null)
@@ -793,6 +794,16 @@ namespace DikuLoad.Import.Ascii
 							var a = stream.ReadNumber();
 							var b = stream.ReadNumber();
 							var d = stream.ReadNumber();
+
+							var reset = new AreaReset
+							{
+								ResetType = AreaResetType.Door,
+								Value2 = vnum,
+								Value3 = b,
+								Value4 = d
+							};
+
+							area.Resets.Add(reset);
 						}
 					}
 					else if (c == 'D')
@@ -893,7 +904,7 @@ namespace DikuLoad.Import.Ascii
 						};
 
 						var keyVNum = stream.ReadNumber();
-						if (exitFlags != OldRoomExitFlags.None && keyVNum != -1)
+						if (exitFlags != OldRoomExitFlags.None && keyVNum != -1 && keyVNum != 0)
 						{
 							exitInfo.KeyObjectVNum = keyVNum;
 						}
@@ -923,7 +934,8 @@ namespace DikuLoad.Import.Ascii
 						if (Settings.SourceType != SourceType.Soulmud)
 						{
 							room.Owner = stream.ReadDikuString();
-						} else
+						}
+						else
 						{
 							var a = stream.ReadNumber();
 							var b = stream.ReadNumber();
@@ -1586,12 +1598,13 @@ namespace DikuLoad.Import.Ascii
 
 					var jsonData = JsonSerializer.Serialize(allMobiles, jsonOptions);
 					File.WriteAllText("allMobiles.json", jsonData);
-				} else
+				}
+				else
 				{
 					var jsonData = File.ReadAllText("allMobiles.json");
 					allMobiles = JsonSerializer.Deserialize<Dictionary<int, Mobile>>(jsonData, jsonOptions);
 
-					foreach(var pair in allMobiles)
+					foreach (var pair in allMobiles)
 					{
 						AddMobileToCache(pair.Key, pair.Value);
 					}
@@ -1600,7 +1613,7 @@ namespace DikuLoad.Import.Ascii
 				var objFiles = Directory.EnumerateFiles(Settings.InputFolder).ToArray();
 				foreach (var objFile in objFiles)
 				{
-					if (!objFile.StartsWith("w.obj"))
+					if (!objFile.Contains("w.obj"))
 					{
 						continue;
 					}
@@ -1628,11 +1641,22 @@ namespace DikuLoad.Import.Ascii
 
 				foreach (var line in lines)
 				{
-					var parts = line.Split(' ');
+					var parts = line.Split(' ', 8, StringSplitOptions.RemoveEmptyEntries);
+					if (parts.Length == 0)
+					{
+						continue;
+					}
+
 					var areaFileName = parts[0];
 					if (!areaFileName.EndsWith(".are"))
 					{
 						continue;
+					}
+
+					var areaName = parts[7];
+					if (areaName.EndsWith("~"))
+					{
+						areaName = areaName.Substring(0, areaName.Length - 1);
 					}
 
 					var wldFile = Path.Combine(wldFolder, areaFileName);
@@ -1644,7 +1668,7 @@ namespace DikuLoad.Import.Ascii
 						var area = new Area
 						{
 							Filename = areaFileName,
-							Name = Path.GetFileNameWithoutExtension(areaFileName),
+							Name = areaName,
 						};
 
 						ProcessRooms(stream, area);

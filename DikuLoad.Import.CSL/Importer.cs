@@ -218,7 +218,7 @@ namespace DikuLoad.Import.CSL
 				{
 					ResetType = resetElement.EnsureEnum<AreaResetType>("Type"),
 					Value2 = resetElement.EnsureInt("Vnum"),
-					Value4	 = resetElement.EnsureInt("Destination"),
+					Value4 = resetElement.EnsureInt("Destination"),
 				};
 
 				if ((reset.ResetType == AreaResetType.Equip || reset.ResetType == AreaResetType.Give) && mobileId != null)
@@ -258,9 +258,23 @@ namespace DikuLoad.Import.CSL
 				{
 					Filename = areaFile,
 					Name = areaData.GetString("Name"),
+					MinimumLevel = areaData.GetString("MinimumLevel"),
+					MaximumLevel = areaData.GetString("MaximumLevel"),
 					Credits = areaData.GetString("Credits"),
 					Builders = areaData.GetString("Builders")
 				};
+
+				if (!string.IsNullOrEmpty(area.Credits))
+				{
+					// Only first word is the credits contains the actual name of the author, the rest is usually the name of the original area or something like that
+					var parts = area.Credits.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+					area.Credits = parts[0];
+				}
+
+				if (string.IsNullOrEmpty(area.Builders))
+				{
+					area.Builders = area.Credits;
+				}
 
 				if (Settings.AreasNames != null && !Settings.AreasNames.Contains(area.Name))
 				{
@@ -269,7 +283,6 @@ namespace DikuLoad.Import.CSL
 				}
 
 				// Try to get levels range from the credits
-				area.ParseLevelsBuilds();
 
 				ProcessRooms(root, area);
 				ProcessMobiles(root, area);

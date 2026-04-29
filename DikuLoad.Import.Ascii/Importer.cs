@@ -3,8 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace DikuLoad.Import.Ascii
 {
@@ -250,6 +252,15 @@ namespace DikuLoad.Import.Ascii
 			}
 			else
 			{
+				if (Settings.SubSourceType == SubSourceType.Exodus)
+				{
+					// Recruit flags
+					var rf1 = stream.ReadFlag();
+					var rf2 = stream.ReadNumber();
+					var rf3 = stream.ReadNumber();
+					var rf4 = stream.ReadNumber();
+				}
+
 
 				flags = stream.ReadFlag();
 				affectedByFlags = stream.ReadFlag();
@@ -334,6 +345,18 @@ namespace DikuLoad.Import.Ascii
 					mobile.ArmorClassSlash = stream.ReadNumber();
 					mobile.ArmorClassExotic = stream.ReadNumber();
 
+					if (Settings.SubSourceType == SubSourceType.Exodus && mobile.ArmorClassExotic == 999)
+					{
+						mobile.ArmorClassExotic = stream.ReadNumber();
+						var act2 = stream.ReadFlag();
+						var blocksExit = stream.ReadNumber();
+
+						if (blocksExit > 50)
+						{
+							var numberOfAttacks = stream.ReadNumber();
+						}
+					}
+
 					offenseFlags = (OldMobileOffensiveFlags)stream.ReadFlag();
 					immuneFlags = (OldResistanceFlags)stream.ReadFlag();
 					resistanceFlags = (OldResistanceFlags)stream.ReadFlag();
@@ -345,8 +368,29 @@ namespace DikuLoad.Import.Ascii
 					mobile.Wealth = stream.ReadNumber();
 					mobile.FormFlags = (FormFlags)stream.ReadFlag();
 					mobile.PartFlags = (PartFlags)stream.ReadFlag();
+
+					if (Settings.SubSourceType == SubSourceType.Exodus)
+					{
+						// 7 numbers
+						for (var i = 0; i < 7; ++i)
+						{
+							var n = stream.ReadNumber();
+						}
+					}
+
 					mobile.Size = stream.ReadWord();
 					mobile.Material = stream.ReadWord();
+
+					if (Settings.SubSourceType == SubSourceType.Exodus)
+					{
+						var defBonus = stream.ReadNumber();
+						var attackBonus = stream.ReadNumber();
+						var maxWeight = stream.ReadNumber();
+						var move = stream.ReadNumber();
+						var defaultMood = stream.ReadNumber();
+						var vocFile = stream.ReadDikuString();
+						var scriptFn = stream.ReadDikuString();
+					}
 				}
 				else if (Settings.SourceType == SourceType.Envy)
 				{
@@ -519,6 +563,10 @@ namespace DikuLoad.Import.Ascii
 			while (!stream.EndOfStream())
 			{
 				var mobile = ProcessMobile(stream);
+				if (mobile == null)
+				{
+					break;
+				}
 
 				if (!CheckForbidden(mobile.Name))
 				{
@@ -538,7 +586,7 @@ namespace DikuLoad.Import.Ascii
 			}
 
 			int vnum;
-			if (!int.TryParse(line.Substring(1), out vnum))
+			if (!int.TryParse(line.Substring(1), out vnum) || vnum == 0)
 			{
 				return null;
 			}
@@ -557,18 +605,10 @@ namespace DikuLoad.Import.Ascii
 
 			obj.ItemType = stream.ReadEnumFromWord<ItemType>();
 
-			if (Settings.SourceType == SourceType.Soulmud)
+			if (Settings.SubSourceType == SubSourceType.Exodus ||
+				Settings.SourceType == SourceType.Soulmud)
 			{
-				while (!stream.EndOfStream())
-				{
-					var c = stream.ReadByte();
-					if (c == '#')
-					{
-						stream.GoBackIfNotEOF();
-						break;
-					}
-				}
-
+				stream.ReadUntil('#');
 				return obj;
 			}
 
@@ -774,6 +814,11 @@ namespace DikuLoad.Import.Ascii
 			while (!stream.EndOfStream())
 			{
 				var obj = ProcessObject(stream);
+				if (obj == null)
+				{
+					break;
+				}
+
 				if (!CheckForbidden(obj.Name))
 				{
 					area.Objects.Add(obj);
@@ -804,7 +849,20 @@ namespace DikuLoad.Import.Ascii
 					break;
 				}
 
+				if (Settings.SubSourceType == SubSourceType.Exodus)
+				{
+					var level = stream.ReadNumber();
+					var exp = stream.ReadNumber();
+					var msg = stream.ReadDikuString();
+					var enterMsg = stream.ReadDikuString();
+					var exitMsg = stream.ReadDikuString();
+					var classFlags = stream.ReadNumber();
+					var raceFlags = stream.ReadNumber();
+					var maxLevel = stream.ReadNumber();
+				}
+
 				var name = stream.ReadDikuString();
+
 				Log($"Processing room {name} (# {vnum})...");
 
 				var room = new Room
@@ -836,6 +894,12 @@ namespace DikuLoad.Import.Ascii
 
 				room.SectorType = stream.ToEnum<SectorType>(parts[add]);
 
+				if (Settings.SubSourceType == SubSourceType.Exodus)
+				{
+					var maxInRoom = stream.ReadNumber();
+					var maxMessage = stream.ReadDikuString();
+				}
+
 				while (!stream.EndOfStream())
 				{
 					var c = stream.ReadSpacedLetter();
@@ -843,6 +907,18 @@ namespace DikuLoad.Import.Ascii
 					if (c == 'S')
 					{
 						break;
+					}
+					else if (c == 'I' && Settings.SubSourceType == SubSourceType.Exodus)
+					{
+						var flags2 = stream.ReadFlag();
+					}
+					else if ((c == 'L' || c == 'N' || c == 'M') && Settings.SubSourceType == SubSourceType.Exodus)
+					{
+						var flags2 = stream.ReadNumber();
+					}
+					else if ((c == 'J' || c == 'K' || c == 'Q') && Settings.SubSourceType == SubSourceType.Exodus)
+					{
+						var msg = stream.ReadDikuString();
 					}
 					else if (c == 'H')
 					{
@@ -1015,7 +1091,7 @@ namespace DikuLoad.Import.Ascii
 						};
 
 						var keyVNum = stream.ReadNumber();
-						if (exitFlags != OldRoomExitFlags.None && keyVNum != -1 && keyVNum != 0)
+						if (keyVNum != -1 && keyVNum != 0)
 						{
 							exitInfo.KeyObjectVNum = keyVNum;
 						}
@@ -1261,7 +1337,8 @@ namespace DikuLoad.Import.Ascii
 					CloseHour = stream.ReadNumber(),
 				};
 
-				if (Settings.SourceType != SourceType.ROM)
+				if (Settings.SourceType != SourceType.ROM ||
+					Settings.SubSourceType == SubSourceType.Exodus)
 				{
 					stream.ReadLine();
 				}
@@ -1415,7 +1492,35 @@ namespace DikuLoad.Import.Ascii
 				{
 					var type = stream.ReadId();
 
-					if (type.StartsWith("AREA") && type.EndsWith("~"))
+					if (type == "AREA")
+					{
+						// Exodus
+						var str = stream.ReadUntil('#');
+						var lines = str.Split('~', StringSplitOptions.RemoveEmptyEntries);
+
+						foreach (var line in lines)
+						{
+							var match = Regex.Match(line.Trim(), @"^[\{\[]\s*(\w+)\s*-?\s*(\w+)\s*[\}\]]\s*(\w+)\s*(.+)");
+							if (match.Success)
+							{
+								area = new Area
+								{
+									Filename = jsonFileName,
+									MinimumLevel = match.Groups[1].Value,
+									MaximumLevel = match.Groups[2].Value,
+									Name = match.Groups[4].Value,
+									Credits = match.Groups[3].Value,
+								};
+
+								area.Name = area.Name.FixName();
+
+								break;
+							}
+						}
+
+						continue;
+					}
+					else if (type.StartsWith("AREA") && type.EndsWith("~"))
 					{
 						var credits = type.Substring(4).RemoveTrailingTilda().Trim();
 						area = new Area
@@ -1430,7 +1535,7 @@ namespace DikuLoad.Import.Ascii
 						}
 						else
 						{
-							// Area name should be after buildes
+							// Area name should be after builders
 							var i = credits.IndexOf(area.Builders);
 							credits = credits.Substring(i + area.Builders.Length + 1);
 						}
@@ -1530,6 +1635,10 @@ namespace DikuLoad.Import.Ascii
 							ProcessResets(stream, area);
 							break;
 						case "SHOPS":
+							if (Settings.SubSourceType == SubSourceType.Exodus)
+							{
+								goto finish;
+							}
 							ProcessShops(stream);
 							break;
 						case "SPECIALS":
@@ -1791,11 +1900,23 @@ namespace DikuLoad.Import.Ascii
 			else
 			if (Settings.SourceType != SourceType.Circle)
 			{
-				var areaFiles = Directory.EnumerateFiles(Settings.InputFolder, "*.are", SearchOption.AllDirectories).ToArray();
-				foreach (var areaFile in areaFiles)
+				var indexFile = Path.Combine(Settings.InputFolder, "area.lst");
+				var indexData = File.ReadAllText(indexFile);
+				var lines = indexData.Split("\n");
+
+				foreach (var line in lines)
 				{
+					var areaFile = Path.Combine(Settings.InputFolder, line).Trim();
+
+					if (!File.Exists(areaFile))
+					{
+						continue;
+					}
+
 					var fn = Path.GetFileName(areaFile);
-					if (fn == "proto.are")
+					if (fn == "proto.are" || fn == "help.are" ||
+						fn == "social.are" || fn == "rom.are" ||
+						fn == "group.are" || fn == "olc.hlp")
 					{
 						Log($"Skipping prototype area {areaFile}");
 						continue;

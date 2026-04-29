@@ -44,6 +44,7 @@ namespace DikuLoad.Data
 		Armor = Ac,
 		Saves = SavingPara,
 		Chr,
+		Str = Strength,
 	}
 
 	public class GameObjectEffect

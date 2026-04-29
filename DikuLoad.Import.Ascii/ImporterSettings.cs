@@ -12,7 +12,8 @@
 	{
 		Default,
 		Circle31,
-		Crimson
+		Crimson,
+		Exodus
 	}
 
 	public class ImporterSettings

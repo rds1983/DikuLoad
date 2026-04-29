@@ -10,6 +10,7 @@ namespace DikuLoad.Data
 		Forest,
 		Hills,
 		Mountain,
+		WaterSwim,
 		WaterNoSwim,
 		Unused,
 		Air,
@@ -39,10 +40,10 @@ namespace DikuLoad.Data
 		Safe,
 		PetShop,
 		NewbiesOnly,
-		Nowhere,
+		Nowhere
 	}
 
-	public class Room: AreaEntity
+	public class Room : AreaEntity
 	{
 		public string Name { get; set; }
 		public string Description { get; set; }

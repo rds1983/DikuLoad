@@ -10,10 +10,10 @@ namespace DikuLoad.Import.Ascii
 	internal static class Utility
 	{
 		private static Regex RegexColorRemover = new Regex(@"\&\w");
+		private static Regex RegexColorRemover2 = new Regex(@"`.");
+		private const string CharsToRemove = @"+\/{}*`|[]-,'!=";
 
 		public static bool RevertFlag = false;
-
-
 
 		public static void RaiseError(this Stream stream, string message)
 		{
@@ -123,6 +123,25 @@ namespace DikuLoad.Import.Ascii
 			}
 
 			return stream.ReadLine().Trim();
+		}
+
+		public static string ReadUntil(this Stream stream, char end)
+		{
+			var sb = new StringBuilder();
+
+			while (!stream.EndOfStream())
+			{
+				var c = (char)stream.ReadByte();
+				if (c == end)
+				{
+					stream.Seek(-1, SeekOrigin.Current);
+					break;
+				}
+
+				sb.Append(c);
+			}
+
+			return sb.ToString();
 		}
 
 		public static void SkipWhitespace(this Stream stream)
@@ -272,6 +291,19 @@ namespace DikuLoad.Import.Ascii
 			return result;
 		}
 
+		public static string FixName(this string result)
+		{
+			result = RegexColorRemover.Replace(result, string.Empty);
+			result = RegexColorRemover2.Replace(result, string.Empty);
+
+			for (var i = 0; i < CharsToRemove.Length; ++i)
+			{
+				result = result.Replace(CharsToRemove[i].ToString(), string.Empty);
+			}
+
+			return result.Trim();
+		}
+
 
 		public static string ReadDikuString(this Stream stream)
 		{
@@ -291,10 +323,7 @@ namespace DikuLoad.Import.Ascii
 
 			var result = sb.ToString();
 
-			// Strip of colors
-			result = RegexColorRemover.Replace(result, string.Empty);
-
-			return result;
+			return result.FixName();
 		}
 
 		public static char EnsureChar(this Stream stream, char expected, bool ignoreCase = false)

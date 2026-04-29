@@ -25,7 +25,7 @@ namespace DikuLoad.Data
 		Mage,
 		Cleric,
 		Thief,
-		Healer,
+		IsHealer,
 		Scavenger,
 		ShopKeeper,
 		Gain,
@@ -52,6 +52,7 @@ namespace DikuLoad.Data
 		AssistAll,
 		AssistGuard,
 		AssistId,
+		AssistVnum,
 		NoKill,
 		Spec,
 		NiceThief,
@@ -66,6 +67,18 @@ namespace DikuLoad.Data
 		Rake,
 		Whip,
 		Zap,
+		Train,
+		Mount,
+		NoScent,
+		Remember,
+		SmartHunt,
+		Ranger,
+		Halt,
+		Hunt,
+		Bard,
+		IsChanger,
+		Tame,
+		Trainer,
 	}
 
 	public enum AffectedByFlags
@@ -122,6 +135,7 @@ namespace DikuLoad.Data
 		Climb,
 		Group,
 		Astral,
+		Blindness,
 	}
 
 	public enum ResistanceFlags

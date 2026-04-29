@@ -45,6 +45,7 @@ namespace DikuLoad.Data
 		Saves = SavingPara,
 		Chr,
 		Str = Strength,
+		Hitpoints = Hit
 	}
 
 	public class GameObjectEffect

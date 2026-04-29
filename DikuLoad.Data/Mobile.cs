@@ -79,6 +79,7 @@ namespace DikuLoad.Data
 		IsChanger,
 		Tame,
 		Trainer,
+		Healer = IsHealer
 	}
 
 	public enum AffectedByFlags
